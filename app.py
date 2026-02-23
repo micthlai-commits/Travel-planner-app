@@ -42,8 +42,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 👇 PASTE YOUR KEYS INSIDE THE QUOTATION MARKS BELOW 👇
-LOCAL_SERPAPI_KEY = "eec6ba6da93267a268042d4571dc41f36a7fa9d4a2ae163fa3daa39567ddbaa8" 
-LOCAL_GOOGLE_KEY = "AIzaSyB__3l2A2GASkWqfgQZrSgP-f-pxcWVNms" 
+LOCAL_SERPAPI_KEY = "" 
+LOCAL_GOOGLE_KEY = "" 
 # 👆 ------------------------------------------------ 👆
 
 # Safely load keys depending on whether it's running locally or on Streamlit Cloud
