@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import time
 from agno.agent import Agent
@@ -8,9 +9,10 @@ from agno.models.google import Gemini
 # --- CONFIGURATION & SECRETS ---
 st.set_page_config(page_title="Academic Travel Planner", layout="wide", page_icon="🎓")
 
-# --- CUSTOM CSS FOR UI STYLING ---
+# --- CUSTOM CSS FOR UI STYLING & PDF PRINTING ---
 st.markdown("""
 <style>
+    /* Timeline & Visual Styles */
     .stMarkdown img {
         border-radius: 12px;
         max-height: 350px;
@@ -30,6 +32,21 @@ st.markdown("""
     }
     .stMarkdown h2 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px;}
     .stMarkdown h3 { color: #1f77b4; padding-top: 15px; }
+    
+    /* 🖨️ PRINT TO PDF STYLES */
+    @media print {
+        /* Hide all user input elements, buttons, and Streamlit menus when saving to PDF */
+        header, footer, .stTextInput, .stNumberInput, .stTextArea, .stSelectbox, .stSlider, .stButton, iframe {
+            display: none !important;
+        }
+        /* Ensure text is black and readable even if the user is in Dark Mode */
+        .stMarkdown, .stMarkdown p, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown li {
+            color: black !important;
+        }
+        /* Prevent images and transit blocks from breaking across pages */
+        img { page-break-inside: avoid; }
+        blockquote { page-break-inside: avoid; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,7 +66,7 @@ except Exception:
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
 if not GOOGLE_API_KEY or not SERPAPI_KEY:
-    st.error("🚨 API Keys missing! Please check Streamlit Secrets or lines 31/32.")
+    st.error("🚨 API Keys missing! Please check Streamlit Secrets or lines 39/40.")
     st.stop()
 
 # --- HEADER ---
@@ -90,8 +107,6 @@ if st.button("✈️ Generate Custom Itinerary (Costs 1 Request)", use_container
     status_container.info("🧠 Master AI is searching the live internet and planning your trip... (This takes about 20-30 seconds)")
     
     try:
-        # We restore the System Instructions and the SerpApiTools because Gemini 3 Flash supports them perfectly!
-        # Update: We must use the exact API ID "gemini-3-flash-preview"
         master_agent = Agent(
             name="Master Travel Architect",
             role="Expert Travel Planner",
@@ -138,16 +153,41 @@ if st.button("✈️ Generate Custom Itinerary (Costs 1 Request)", use_container
         
         st.markdown(response.content, unsafe_allow_html=True)
         
-        # --- DOWNLOAD BUTTON ---
+        # --- DOWNLOAD & PDF EXPORT BUTTONS ---
         st.markdown("---")
-        st.download_button(
-            label="📄 Download Full Itinerary (.md)",
-            data=response.content,
-            file_name=f"Custom_Itinerary_{destination.replace(' ', '_')}.md",
-            mime="text/markdown",
-            use_container_width=True
-        )
+        colA, colB = st.columns(2)
         
+        with colA:
+            st.download_button(
+                label="📄 Download Raw Markdown (.md)",
+                data=response.content,
+                file_name=f"Custom_Itinerary_{destination.replace(' ', '_')}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
+            
+        with colB:
+            # Injecting a Javascript "Print to PDF" button that triggers the browser's native PDF generator
+            components.html(
+                """
+                <script>
+                function printPage() {
+                    window.parent.print();
+                }
+                </script>
+                <button onclick="printPage()" style="width: 100%; padding: 0.5rem 1rem; background-color: #ffffff; border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; color: #31333F; font-family: 'Source Sans Pro', sans-serif; font-size: 1rem; cursor: pointer; transition: all 0.2s ease;">
+                    🖨️ Save as PDF
+                </button>
+                <style>
+                    button:hover {
+                        border-color: #ff4b4b !important;
+                        color: #ff4b4b !important;
+                    }
+                </style>
+                """,
+                height=50
+            )
+            
     except Exception as e:
         status_container.error(f"An error occurred: {str(e)}")
         if "429" in str(e) or "quota" in str(e).lower():
