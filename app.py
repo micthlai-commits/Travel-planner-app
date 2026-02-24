@@ -128,7 +128,7 @@ with st.sidebar:
 # Empty State: Inspiration Gallery (Upgrade 3)
 if not generate_btn:
     st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect academic travel itinerary</p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
     
     st.info("👈 Use the Dashboard on the left to configure your parameters and generate a custom AI dossier!")
     
