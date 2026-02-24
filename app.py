@@ -86,82 +86,30 @@ st.markdown("---")
 
 # --- 4-AGENT ARCHITECTURE (Model-Mixed for Quota Saving) ---
 def get_agents():
-    # Agent 1 uses 2.5-flash-8b (Untouched Quota)
+    # We are removing "instructions=[]" because Gemma 3 models do not 
+    # support the "Developer Instruction" (System Prompt) API field yet.
+    # Instead, we will feed the instructions directly as the user prompt!
+    
     researcher = Agent(
         name="Destination Researcher",
-        role="Tourism Research Specialist",
-        instructions=[
-            f"Conduct an in-depth analysis of {destination} for a trip taking place in {travel_month}.",
-            f"Focus heavily on the constraints of a '{traveler_persona}'.",
-            f"CRITICAL: The user requested these specific preferences: '{user_preferences}'. You MUST tailor the attractions to match this exact description.",
-            "Identify 5 to 8 key attractions that fit the user's description. For EACH attraction, provide:",
-            "1. Its significance and why it matches the user's preferences.",
-            "2. Estimated time required for a visit.",
-            "3. A clickable Google Maps link. Format exactly: `[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)`. Replace spaces in the query with a plus sign `+`.",
-            "4. A photograph. DO NOT use Markdown formatting. You MUST use an HTML image tag. Format exactly: `<img src=\"https://image.pollinations.ai/prompt/Location+Name+City\">`. CRITICAL RULE: Replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS."
-        ],
         model=Gemini(id="gemma-3-27b-it"),
         tools=[SerpApiTools(api_key=SERPAPI_KEY)],
     )
 
-    # Agent 2 uses gemma-3-12b-it (14,400 Free Requests!)
     hotel_finder = Agent(
         name="Accommodation Expert",
-        role="Hospitality & Dining Scout",
-        instructions=[
-            f"Find 3 accommodation options in {destination} fitting a '{budget}' budget and suitable for a '{traveler_persona}'.",
-            f"CRITICAL REQUIREMENT: Ensure the hotels and restaurants strictly follow these user preferences: '{user_preferences}'.",
-            "Explain WHY each hotel fits the user's specific request.",
-            "Identify 4 highly-rated local restaurants that match their food preferences.",
-            "For EVERY hotel and restaurant, provide a Google Maps link exactly: `[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Place+Name)`. Replace spaces with a plus sign `+`.",
-            "For EVERY hotel and restaurant, DO NOT use Markdown formatting. You MUST use an HTML image tag. Format exactly: `<img src=\"https://image.pollinations.ai/prompt/Place+Name+City\">`. CRITICAL RULE: Replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS."
-        ],
         model=Gemini(id="gemma-3-12b-it"),
         tools=[SerpApiTools(api_key=SERPAPI_KEY)],
     )
 
-    # Agent 3 uses gemma-3-4b-it (14,400 Free Requests!)
     logistics_agent = Agent(
         name="Logistics Specialist",
-        role="Travel Practicalities Expert",
-        instructions=[
-            f"Research practical travel information for tourists traveling to {destination} in {travel_month}.",
-            "Provide the following sections clearly formatted in Markdown:",
-            "1. **Flight & Entry Logistics**: What are the major airports? What are the general visa requirements?",
-            f"2. **Local Transportation**: What is the best way to get around {destination}?",
-            "3. **Cultural Etiquette & Taboos**: What are 3 crucial behavioral rules tourists should follow here?",
-            f"4. **Seasonal Weather & Packing ({travel_month})**: What should tourists pack?"
-        ],
         model=Gemini(id="gemma-3-4b-it"),
         tools=[SerpApiTools(api_key=SERPAPI_KEY)],
     )
 
-    # Agent 4 uses gemma-3-27b-it
     planner = Agent(
         name="Itinerary Architect",
-        role="Senior Travel Planner",
-        instructions=[
-            f"You are teaching students how to build a {num_days}-day itinerary in {destination} for a '{traveler_persona}'.",
-            f"The user specifically wants this type of trip: '{user_preferences}'. Make sure the pacing matches this!",
-            "Use the attractions and hotels provided by the other agents to build a day-by-day schedule.",
-            "CRITICAL: Focus on geographical routing. Group locations that are close to each other on the same day.",
-            "---",
-            "FORMATTING RULES FOR A BEAUTIFUL TIMELINE ITINERARY:",
-            "1. Start each day with a clear header (e.g., '## 🗓️ Day 1: Exploring Historic Districts').",
-            "2. Break down each day into **🌅 Morning**, **☀️ Afternoon**, and **🌙 Evening**.",
-            "3. For every single location or restaurant, you MUST use this exact layout:",
-            "",
-            "   ### 📍 [Name of Location]",
-            "   **⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
-            "   <br><br>",
-            "   [INSERT THE EXACT HTML <img src=\"...\"> TAG PROVIDED BY THE PREVIOUS AGENTS HERE]",
-            "   <br><br>",
-            "   *Write a short, engaging description of what to do here.*",
-            "",
-            "4. BETWEEN each location, you MUST use a Markdown Blockquote to show the transit time. It must look exactly like this:",
-            "   > 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
-            "5. CRITICAL IMAGE RULE: You MUST copy the actual image URLs provided by the other agents. Do NOT literally write 'url_from_previous_agents'. Make sure every location has a valid `<img src=\"https://image.pollinations.ai/...\">` HTML tag."
-        ],
         model=Gemini(id="gemma-3-27b-it"),
     )
     return researcher, hotel_finder, logistics_agent, planner
@@ -178,7 +126,19 @@ if st.button("✈️ Generate Custom Itinerary", use_container_width=True):
     try:
         # Step 1: Research
         status_container.info(f"🔍 Agent 1 (Researcher: gemma-3-27b-it) is finding attractions...")
-        research_prompt = f"Find attractions in {destination} for a {num_days}-day trip matching these preferences: {user_preferences}."
+        research_prompt = f"""
+ROLE: Tourism Research Specialist
+
+Conduct an in-depth analysis of {destination} for a trip taking place in {travel_month}.
+Focus heavily on the constraints of a '{traveler_persona}'.
+CRITICAL: The user requested these specific preferences: '{user_preferences}'. You MUST tailor the attractions to match this exact description.
+
+Identify 5 to 8 key attractions that fit the user's description. For EACH attraction, provide:
+1. Its significance and why it matches the user's preferences.
+2. Estimated time required for a visit.
+3. A clickable Google Maps link. Format exactly: `[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)`. Replace spaces in the query with a plus sign `+`.
+4. A photograph. DO NOT use Markdown formatting. You MUST use an HTML image tag. Format exactly: `<img src="https://image.pollinations.ai/prompt/Location+Name+City">`. CRITICAL RULE: Replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS.
+"""
         research_response = researcher.run(research_prompt, stream=False)
         with tab2:
             st.markdown(research_response.content, unsafe_allow_html=True)
@@ -188,7 +148,17 @@ if st.button("✈️ Generate Custom Itinerary", use_container_width=True):
 
         # Step 2: Hospitality
         status_container.info(f"🏨 Agent 2 (Accommodation: gemma-3-12b-it) is finding {budget} hotels...")
-        hotel_prompt = f"Find accommodations and dining in {destination} suitable for {budget} matching: {user_preferences}."
+        hotel_prompt = f"""
+ROLE: Hospitality & Dining Scout
+
+Find 3 accommodation options in {destination} fitting a '{budget}' budget and suitable for a '{traveler_persona}'.
+CRITICAL REQUIREMENT: Ensure the hotels and restaurants strictly follow these user preferences: '{user_preferences}'.
+Explain WHY each hotel fits the user's specific request.
+
+Identify 4 highly-rated local restaurants that match their food preferences.
+For EVERY hotel and restaurant, provide a Google Maps link exactly: `[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Place+Name)`. Replace spaces with a plus sign `+`.
+For EVERY hotel and restaurant, DO NOT use Markdown formatting. You MUST use an HTML image tag. Format exactly: `<img src="https://image.pollinations.ai/prompt/Place+Name+City">`. CRITICAL RULE: Replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS.
+"""
         hotel_response = hotel_finder.run(hotel_prompt, stream=False)
         with tab3:
             st.markdown(hotel_response.content, unsafe_allow_html=True)
@@ -198,7 +168,16 @@ if st.button("✈️ Generate Custom Itinerary", use_container_width=True):
 
         # Step 3: Logistics 
         status_container.info(f"🛂 Agent 3 (Logistics: gemma-3-4b-it) is gathering transit & weather info...")
-        logistics_prompt = f"Find major airports, general visa rules, and weather for {travel_month} in {destination}."
+        logistics_prompt = f"""
+ROLE: Travel Practicalities Expert
+
+Research practical travel information for tourists traveling to {destination} in {travel_month}.
+Provide the following sections clearly formatted in Markdown:
+1. **Flight & Entry Logistics**: What are the major airports? What are the general visa requirements?
+2. **Local Transportation**: What is the best way to get around {destination}?
+3. **Cultural Etiquette & Taboos**: What are 3 crucial behavioral rules tourists should follow here?
+4. **Seasonal Weather & Packing ({travel_month})**: What should tourists pack?
+"""
         logistics_response = logistics_agent.run(logistics_prompt, stream=False)
         with tab4:
             st.markdown(logistics_response.content, unsafe_allow_html=True)
@@ -208,11 +187,40 @@ if st.button("✈️ Generate Custom Itinerary", use_container_width=True):
 
         # Step 4: Synthesis
         status_container.info("📝 Agent 4 (Master Planner: gemma-3-27b-it) is building your perfect day-by-day schedule...")
-        plan_prompt = (
-            f"Create a {num_days}-day itinerary for {destination}. "
-            f"Combine this research: {research_response.content} and these hotels/restaurants: {hotel_response.content}. "
-            f"Ensure the pacing strictly aligns with the user's preference: {user_preferences}."
-        )
+        plan_prompt = f"""
+ROLE: Senior Travel Planner
+
+You are teaching students how to build a {num_days}-day itinerary in {destination} for a '{traveler_persona}'.
+The user specifically wants this type of trip: '{user_preferences}'. Make sure the pacing matches this!
+
+Use the attractions and hotels provided below to build a day-by-day schedule.
+CRITICAL: Focus on geographical routing. Group locations that are close to each other on the same day.
+---
+FORMATTING RULES FOR A BEAUTIFUL TIMELINE ITINERARY:
+1. Start each day with a clear header (e.g., '## 🗓️ Day 1: Exploring Historic Districts').
+2. Break down each day into **🌅 Morning**, **☀️ Afternoon**, and **🌙 Evening**.
+3. For every single location or restaurant, you MUST use this exact layout:
+
+   ### 📍 [Name of Location]
+   **⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**
+   <br><br>
+   [INSERT THE EXACT HTML <img src="..."> TAG PROVIDED BY THE PREVIOUS AGENTS HERE]
+   <br><br>
+   *Write a short, engaging description of what to do here.*
+
+4. BETWEEN each location, you MUST use a Markdown Blockquote to show the transit time. It must look exactly like this:
+   > 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location
+5. CRITICAL IMAGE RULE: You MUST copy the actual image URLs provided by the other agents. Do NOT literally write 'url_from_previous_agents'. Make sure every location has a valid `<img src="https://image.pollinations.ai/...">` HTML tag.
+
+---
+HERE IS THE RESEARCH TO COMBINE:
+
+**RESEARCHED ATTRACTIONS:**
+{research_response.content}
+
+**RESEARCHED HOTELS & RESTAURANTS:**
+{hotel_response.content}
+"""
         itinerary_response = planner.run(plan_prompt, stream=False)
         with tab1:
             st.markdown(itinerary_response.content, unsafe_allow_html=True)
