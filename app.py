@@ -26,6 +26,13 @@ st.markdown("""
         transform: translateY(-5px);
         box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
     }
+    
+    /* Apply rounded corners to Main Screen Images (Gallery & Hero Banner) */
+    [data-testid="stMainBlock"] [data-testid="stImage"] img {
+        border-radius: 16px;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+
     .stMarkdown blockquote {
         border-left: 6px solid #FF4B4B; 
         background: linear-gradient(90deg, rgba(255, 75, 75, 0.08) 0%, rgba(255, 255, 255, 0) 100%);
@@ -129,18 +136,18 @@ if not generate_btn:
     gal1, gal2, gal3 = st.columns(3)
     
     with gal1:
-        # Changed to ultra-reliable Unsplash photography
-        st.image("https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&q=80", use_container_width=True)
+        # Added &h=400 to force a 3:2 aspect ratio crop for uniformity
+        st.image("https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
         st.markdown("#### 🗼 Tokyo, Japan")
         st.caption("Neon lights, ancient temples, and culinary perfection.")
     with gal2:
-        # Changed to ultra-reliable Unsplash photography
-        st.image("https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&q=80", use_container_width=True)
+        # Added &h=400 to force a 3:2 aspect ratio crop for uniformity
+        st.image("https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
         st.markdown("#### 🥐 Paris, France")
         st.caption("Art, romance, and café culture by the Seine.")
     with gal3:
-        # Changed to ultra-reliable Unsplash photography
-        st.image("https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&q=80", use_container_width=True)
+        # Added &h=400 to force a 3:2 aspect ratio crop for uniformity
+        st.image("https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
         st.markdown("#### 🏔️ Banff, Canada")
         st.caption("Crystal lakes, towering peaks, and ultimate wilderness.")
 
@@ -150,7 +157,7 @@ if generate_btn:
     
     # Hero Banner
     safe_dest = urllib.parse.quote(destination)
-    st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}", use_container_width=True)
+    st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
     
     # Trip Summary Metric Cards (Upgrade 2)
     m1, m2, m3, m4 = st.columns(4)
