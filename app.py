@@ -20,6 +20,10 @@ st.markdown("""
         width: 100%;
         margin-bottom: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    .stMarkdown img:hover {
+        transform: scale(1.02);
     }
     .stMarkdown blockquote {
         border-left: 5px solid #ff4b4b; 
@@ -125,7 +129,14 @@ if st.button("✈️ Generate Custom Itinerary (Costs 1 Request)", use_container
                 "",
                 "## 🏨 Part 2: Top Accommodation Picks",
                 "- Provide 3 currently operating hotel recommendations fitting the budget and preferences.",
-                "- For each, include a Google Maps link.",
+                "- For EVERY hotel, you MUST include a photo and map link using this exact layout:",
+                "",
+                "  ### 🏨 [Hotel Name]",
+                "  **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
+                "  <br><br>",
+                "  <img src=\"https://image.pollinations.ai/prompt/Hotel+Name+City+Exterior+Photography\">",
+                "  <br><br>",
+                "  *Write a short explanation of why this fits the user.*",
                 "",
                 "## 🗓️ Part 3: The Day-by-Day Itinerary",
                 "Create the day-by-day schedule. Group locations geographically. Break each day into Morning, Afternoon, and Evening.",
@@ -134,13 +145,13 @@ if st.button("✈️ Generate Custom Itinerary (Costs 1 Request)", use_container
                 "### 📍 [Name of Location]",
                 "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
                 "<br><br>",
-                "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City\">",
+                "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City+Tourism+Photography\">",
                 "<br><br>",
                 "*Write a short, engaging description.*",
                 "",
                 "> 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
                 "",
-                "CRITICAL IMAGE RULE: For the `<img src=\"...\">` tags, you MUST replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS (like &, -, '). Use ONLY letters and plus signs! Example: `<img src=\"https://image.pollinations.ai/prompt/Fushimi+Inari+Shrine+Kyoto\">`."
+                "CRITICAL IMAGE RULE: For the `<img src=\"...\">` tags, you MUST replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS (like &, -, '). Use ONLY letters and plus signs! Example: `<img src=\"https://image.pollinations.ai/prompt/Fushimi+Inari+Shrine+Kyoto+Photography\">`."
             ],
             model=Gemini(id="gemini-3-flash-preview"),
             tools=[SerpApiTools(api_key=SERPAPI_KEY)],
