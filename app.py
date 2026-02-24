@@ -110,7 +110,7 @@ def get_agents():
             "3. A clickable Google Maps link. Format exactly: `[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)`. Replace spaces in the query with a plus sign `+`.",
             "4. A photograph. DO NOT use Markdown formatting. You MUST use an HTML image tag. Format exactly: `<img src=\"https://image.pollinations.ai/prompt/Location+Name+City\">`. CRITICAL RULE: You MUST replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS (like &, -, ', etc.) from the URL. Use ONLY letters and plus signs. Example: `<img src=\"https://image.pollinations.ai/prompt/Fushimi+Inari+Shrine+Kyoto\">`"
         ],
-        model=Gemini(id="gemini-3-flash-preview"),
+        model=Gemini(id="gemini-2.5-flash-lite"),
         tools=[SerpApiTools(api_key=SERPAPI_KEY)],
     )
 
@@ -126,7 +126,7 @@ def get_agents():
             "For EVERY hotel and restaurant, provide a Google Maps link exactly: `[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Place+Name)`. Replace spaces with a plus sign `+`.",
             "For EVERY hotel and restaurant, DO NOT use Markdown formatting. You MUST use an HTML image tag. Format exactly: `<img src=\"https://image.pollinations.ai/prompt/Place+Name+City\">`. CRITICAL RULE: You MUST replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Example: `<img src=\"https://image.pollinations.ai/prompt/Ritz+Carlton+Kyoto\">`"
         ],
-        model=Gemini(id="gemini-3-flash-preview"),
+        model=Gemini(id="gemini-2.5-flash-lite"),
         tools=[SerpApiTools(api_key=SERPAPI_KEY)],
     )
 
@@ -142,7 +142,7 @@ def get_agents():
             "3. **Cultural Etiquette & Taboos**: What are 3 crucial behavioral rules tourists should follow here?",
             f"4. **Seasonal Weather & Packing ({travel_month})**: What should tourists pack?"
         ],
-        model=Gemini(id="gemini-3-flash-preview"),
+        model=Gemini(id="gemini-2.5-flash-lite"),
         tools=[SerpApiTools(api_key=SERPAPI_KEY)],
     )
 
@@ -172,7 +172,7 @@ def get_agents():
             "   > 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
             "5. CRITICAL: NEVER use Markdown `![Image](url)`. You MUST use the HTML `<img src=\"...\">` tag exactly as provided by the previous agents, and you MUST include the `<br><br>` tags around it to force proper line spacing."
         ],
-        model=Gemini(id="gemini-3-flash-preview"),
+        model=Gemini(id="gemini-2.5-flash-lite"),
     )
     return researcher, hotel_finder, logistics_agent, planner
 
