@@ -1,14 +1,13 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import os
-import time
 import urllib.parse
 from agno.agent import Agent
 from agno.tools.serpapi import SerpApiTools
 from agno.models.google import Gemini
 
 # --- CONFIGURATION & SECRETS ---
-st.set_page_config(page_title="Academic Travel Planner", layout="wide", page_icon="✈️")
+st.set_page_config(page_title="Academic Travel Planner", layout="wide", page_icon="✈️", initial_sidebar_state="expanded")
 
 # --- CUSTOM CSS FOR PREMIUM UI & PDF PRINTING ---
 st.markdown("""
@@ -41,18 +40,27 @@ st.markdown("""
         color: #1E293B; 
         border-bottom: 3px solid #F1F5F9; 
         padding-bottom: 10px; 
-        margin-top: 40px;
+        margin-top: 30px;
         font-weight: 800;
     }
     .stMarkdown h3 { 
         color: #2563EB; 
-        padding-top: 20px; 
+        padding-top: 15px; 
         font-weight: 700;
+    }
+    
+    /* Make Metric Cards pop */
+    div[data-testid="metric-container"] {
+        background-color: rgba(241, 245, 249, 0.5);
+        border: 1px solid #e2e8f0;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     
     /* 🖨️ PRINT TO PDF STYLES */
     @media print {
-        header, footer, .stTextInput, .stNumberInput, .stTextArea, .stSelectbox, .stSlider, .stButton, iframe, .stExpander {
+        header, footer, [data-testid="stSidebar"], .stButton, iframe, [data-testid="stStatusWidget"] {
             display: none !important;
         }
         .stMarkdown, .stMarkdown p, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown li, .stMarkdown blockquote {
@@ -82,47 +90,78 @@ if not GOOGLE_API_KEY or not SERPAPI_KEY:
     st.error("🚨 API Keys missing! Please check Streamlit Secrets.")
     st.stop()
 
-# --- HERO BANNER AREA ---
-st.markdown('<h1 style="text-align: center; font-size: 3rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #64748b; margin-bottom: 30px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
-
-# --- USER INPUTS (Inside a sleek expander) ---
-with st.expander("⚙️ **Configure Travel Parameters**", expanded=True):
-    st.subheader("1. The Basics")
+# --- SIDEBAR: DASHBOARD LAYOUT (Upgrade 1) ---
+with st.sidebar:
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
+    st.markdown("### ⚙️ Trip Configuration")
+    
+    destination = st.text_input("🛬 Destination:", "Kyoto, Japan")
+    
     col1, col2 = st.columns(2)
     with col1:
-        destination = st.text_input("🛬 Destination (City/Region):", "Kyoto, Japan")
+        num_days = st.number_input("📅 Days:", min_value=1, max_value=14, value=4)
     with col2:
-        num_days = st.number_input("📅 Duration (Days):", min_value=1, max_value=14, value=4)
-
-    st.markdown("---")
-    st.subheader("2. Travel Preferences")
-    user_preferences = st.text_area(
-        "✍️ Describe your ideal trip:",
-        placeholder="E.g., I love outdoor hiking but hate crowded museums. I need a hotel with a swimming pool, and I want to eat a lot of local street food. Keep it relaxing.",
-        height=100
-    )
-
-    col4, col5, col6 = st.columns(3)
-    with col4:
-        travel_month = st.selectbox("🗓️ Month:", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], index=2)
-    with col5:
-        traveler_persona = st.selectbox("👥 Traveler Type:", ["Solo Independent Traveler", "Couple / DINKs", "Family with Young Children", "Seniors / Retirees", "Student Group"])
-    with col6:
-        budget = st.select_slider("💰 Budget Level:", options=["Budget/Backpacker", "Mid-Range", "Luxury/Boutique"], value="Mid-Range")
-
-# --- MAIN EXECUTION ---
-if st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary"):
+        travel_month = st.selectbox("🗓️ Month:", ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], index=2)
+        
+    traveler_persona = st.selectbox("👥 Persona:", ["Solo Independent Traveler", "Couple / DINKs", "Family with Young Children", "Seniors / Retirees", "Student Group"])
+    budget = st.select_slider("💰 Budget Level:", options=["Budget/Backpacker", "Mid-Range", "Luxury/Boutique"], value="Mid-Range")
     
-    # Show a dynamic hero image based on their destination while loading!
+    user_preferences = st.text_area(
+        "✍️ Custom Preferences:",
+        placeholder="E.g., I love outdoor hiking but hate crowded museums. Need a pool.",
+        height=120
+    )
+    
+    st.markdown("---")
+    # Generate button moved to the sidebar!
+    generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
+
+# --- MAIN SCREEN AREA ---
+
+# Empty State: Inspiration Gallery (Upgrade 3)
+if not generate_btn:
+    st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect academic travel itinerary</p>', unsafe_allow_html=True)
+    
+    st.info("👈 Use the Dashboard on the left to configure your parameters and generate a custom AI dossier!")
+    
+    st.markdown("### ✨ Inspiration Gallery")
+    gal1, gal2, gal3 = st.columns(3)
+    
+    with gal1:
+        st.image("https://image.pollinations.ai/prompt/Tokyo+Japan+Cyberpunk+Night+Photography?width=400&height=400", use_container_width=True)
+        st.markdown("#### 🗼 Tokyo, Japan")
+        st.caption("Neon lights, ancient temples, and culinary perfection.")
+    with gal2:
+        st.image("https://image.pollinations.ai/prompt/Paris+France+Eiffel+Tower+Sunset+Photography?width=400&height=400", use_container_width=True)
+        st.markdown("#### 🥐 Paris, France")
+        st.caption("Art, romance, and café culture by the Seine.")
+    with gal3:
+        st.image("https://image.pollinations.ai/prompt/Banff+National+Park+Canada+Mountain+Photography?width=400&height=400", use_container_width=True)
+        st.markdown("#### 🏔️ Banff, Canada")
+        st.caption("Crystal lakes, towering peaks, and ultimate wilderness.")
+
+# Active State: Itinerary Generation
+if generate_btn:
+    st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{destination.upper()}</h1>', unsafe_allow_html=True)
+    
+    # Hero Banner
     safe_dest = urllib.parse.quote(destination)
     st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
     
-    # Animated Loading Status
-    with st.status("🤖 **Master AI is constructing your dossier...**", expanded=True) as status:
+    # Trip Summary Metric Cards (Upgrade 2)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("📍 Destination", destination)
+    m2.metric("🗓️ Duration", f"{num_days} Days ({travel_month})")
+    m3.metric("💰 Budget", budget)
+    m4.metric("👥 Persona", traveler_persona)
+    
+    st.markdown("---")
+    
+    with st.status("🤖 **Master AI is researching and routing your dossier...**", expanded=True) as status:
         st.write("🔍 Searching the live internet for up-to-date logistics...")
         st.write("🏨 Scouting accommodations that match your budget...")
-        st.write("🗺️ Routing attractions geographically...")
+        st.write("🗺️ Organizing tabs and formatting photography...")
         
         try:
             master_agent = Agent(
@@ -133,18 +172,22 @@ if st.button("✨ Generate Premium Itinerary", use_container_width=True, type="p
                     f"The traveler is a '{traveler_persona}' on a '{budget}' budget.",
                     f"CRITICAL RULES: The user requested these specific preferences: '{user_preferences}'. Your ENTIRE itinerary must revolve around these preferences.",
                     "USE YOUR WEB SEARCH TOOL to find up-to-date information on visas, currently open hotels, and real-time logistics.",
-                    "Generate a single, beautifully formatted Markdown document divided into these sections:",
-                    "",
-                    "## 🛂 Part 1: Logistics & Practicalities (Live Data)",
+                    "---",
+                    "CRITICAL FORMATTING RULE FOR TABS:",
+                    "You MUST divide your document into 3 distinct sections using EXACTLY this text separator on its own line: `---TAB_SEPARATOR---`",
+                    "If you do not use `---TAB_SEPARATOR---` exactly twice, the app will break.",
+                    "---",
+                    "## 🛂 Part 1: Logistics & Practicalities",
                     "- **Flight & Airports:** Major entry points.",
                     "- **Weather:** What to pack for this month.",
                     "- **Transport:** Best way to get around.",
                     "- **Etiquette:** 3 local rules to respect.",
                     "",
+                    "---TAB_SEPARATOR---",
+                    "",
                     "## 🏨 Part 2: Top Accommodation Picks",
                     "- Provide 3 currently operating hotel recommendations fitting the budget and preferences.",
                     "- For EVERY hotel, you MUST include a photo and map link using this exact layout:",
-                    "",
                     "  ### 🏨 [Hotel Name]",
                     "  **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
                     "  <br><br>",
@@ -152,11 +195,12 @@ if st.button("✨ Generate Premium Itinerary", use_container_width=True, type="p
                     "  <br><br>",
                     "  *Write a short explanation of why this fits the user.*",
                     "",
-                    "## 🗓️ Part 3: The Day-by-Day Itinerary",
-                    "Create a detailed day-by-day schedule. You MUST include top tourist attractions, historical sites, natural attractions, hidden gems, events, and local activities that match the user's preferences. Group these attractions geographically.",
-                    "Break each day into Morning, Afternoon, and Evening.",
-                    "For EVERY single attraction, location, or restaurant, you MUST use this exact layout (with the HTML tags):",
+                    "---TAB_SEPARATOR---",
                     "",
+                    "## 🗓️ Part 3: The Day-by-Day Itinerary",
+                    "Create a detailed day-by-day schedule. Include top tourist attractions, historical sites, natural attractions, and hidden gems. Group them geographically.",
+                    "Break each day into Morning, Afternoon, and Evening.",
+                    "For EVERY single location or restaurant, you MUST use this exact layout:",
                     "### 📍 [Name of Location]",
                     "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
                     "<br><br>",
@@ -166,7 +210,7 @@ if st.button("✨ Generate Premium Itinerary", use_container_width=True, type="p
                     "",
                     "> 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
                     "",
-                    "CRITICAL IMAGE RULE: For the `<img src=\"...\">` tags, you MUST replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS (like &, -, '). Use ONLY letters and plus signs! Example: `<img src=\"https://image.pollinations.ai/prompt/Fushimi+Inari+Shrine+Kyoto+Photography\">`."
+                    "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!"
                 ],
                 model=Gemini(id="gemini-3-flash-preview"),
                 tools=[SerpApiTools(api_key=SERPAPI_KEY)],
@@ -177,8 +221,25 @@ if st.button("✨ Generate Premium Itinerary", use_container_width=True, type="p
             
             status.update(label="✅ **Master Dossier Complete!**", state="complete", expanded=False)
             
-            # Display final result
-            st.markdown(response.content, unsafe_allow_html=True)
+            # Celebratory Animations (Upgrade 4)
+            st.balloons()
+            st.toast('Your custom itinerary has been successfully generated!', icon='🎉')
+            
+            # Tabbed Navigation (Upgrade 5)
+            raw_content = response.content
+            parts = raw_content.split("---TAB_SEPARATOR---")
+            
+            if len(parts) >= 3:
+                tab1, tab2, tab3 = st.tabs(["🛂 Logistics & Practicalities", "🏨 Accommodations", "🗺️ Day-by-Day Itinerary"])
+                with tab1:
+                    st.markdown(parts[0], unsafe_allow_html=True)
+                with tab2:
+                    st.markdown(parts[1], unsafe_allow_html=True)
+                with tab3:
+                    st.markdown(parts[2], unsafe_allow_html=True)
+            else:
+                st.warning("Could not automatically separate the tabs. Displaying full dossier below:")
+                st.markdown(raw_content, unsafe_allow_html=True)
             
             # --- DOWNLOAD & PDF EXPORT BUTTONS ---
             st.markdown("---")
@@ -187,7 +248,7 @@ if st.button("✨ Generate Premium Itinerary", use_container_width=True, type="p
             with colA:
                 st.download_button(
                     label="📄 Download Raw Markdown (.md)",
-                    data=response.content,
+                    data=raw_content.replace("---TAB_SEPARATOR---", "\n\n---\n\n"),
                     file_name=f"Custom_Itinerary_{destination.replace(' ', '_')}.md",
                     mime="text/markdown",
                     use_container_width=True
