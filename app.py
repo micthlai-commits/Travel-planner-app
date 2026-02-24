@@ -84,7 +84,7 @@ if not GOOGLE_API_KEY or not SERPAPI_KEY:
 
 # --- HERO BANNER AREA ---
 st.markdown('<h1 style="text-align: center; font-size: 3rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #64748b; margin-bottom: 30px;">Design your perfect academic travel itinerary</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #64748b; margin-bottom: 30px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
 
 # --- USER INPUTS (Inside a sleek expander) ---
 with st.expander("⚙️ **Configure Travel Parameters**", expanded=True):
