@@ -91,6 +91,7 @@ if st.button("✈️ Generate Custom Itinerary (Costs 1 Request)", use_container
     
     try:
         # We restore the System Instructions and the SerpApiTools because Gemini 3 Flash supports them perfectly!
+        # Update: We must use the exact API ID "gemini-3-flash-preview"
         master_agent = Agent(
             name="Master Travel Architect",
             role="Expert Travel Planner",
@@ -126,7 +127,7 @@ if st.button("✈️ Generate Custom Itinerary (Costs 1 Request)", use_container
                 "",
                 "CRITICAL IMAGE RULE: For the `<img src=\"...\">` tags, you MUST replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS (like &, -, '). Use ONLY letters and plus signs! Example: `<img src=\"https://image.pollinations.ai/prompt/Fushimi+Inari+Shrine+Kyoto\">`."
             ],
-            model=Gemini(id="gemini-3-flash"),
+            model=Gemini(id="gemini-3-flash-preview"),
             tools=[SerpApiTools(api_key=SERPAPI_KEY)],
         )
 
@@ -150,4 +151,4 @@ if st.button("✈️ Generate Custom Itinerary (Costs 1 Request)", use_container
     except Exception as e:
         status_container.error(f"An error occurred: {str(e)}")
         if "429" in str(e) or "quota" in str(e).lower():
-            st.error("🚨 You have hit your 20-request limit for the day on this model. The quota will reset at 4:00 PM Hong Kong Time. Alternatively, switch `gemini-3-flash` to `gemini-2.5-flash` in the code to use your other bucket!")
+            st.error("🚨 You have hit your 20-request limit for the day on this model. The quota will reset at 4:00 PM Hong Kong Time. Alternatively, switch `gemini-3-flash-preview` to `gemini-2.5-flash` in the code to use your other bucket!")
