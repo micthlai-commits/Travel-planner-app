@@ -100,7 +100,7 @@ with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
     st.markdown("### ⚙️ Trip Configuration")
     
-    destination = st.text_input("🛬 Destination:", "Kyoto, Japan")
+    destination = st.text_input("🛬 Destination:", "")
     
     col1, col2 = st.columns(2)
     with col1:
