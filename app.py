@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 import urllib.parse
+import time
 from agno.agent import Agent
 from agno.tools.serpapi import SerpApiTools
 from agno.models.google import Gemini
@@ -97,7 +98,7 @@ if not GOOGLE_API_KEY or not SERPAPI_KEY:
     st.error("🚨 API Keys missing! Please check Streamlit Secrets.")
     st.stop()
 
-# --- SIDEBAR: DASHBOARD LAYOUT (Upgrade 1) ---
+# --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
     st.markdown("### ⚙️ Trip Configuration")
@@ -120,21 +121,6 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    
-    # NEW FEATURE: AI Engine Selector
-    with st.expander("🛠️ Advanced Settings (Quota Fix)"):
-        st.caption("If you hit an API limit, simply switch the engine below to use a fresh bucket of 20 requests!")
-        selected_model = st.selectbox(
-            "🤖 Select AI Engine:", 
-            [
-                "gemini-2.5-flash", 
-                "gemini-3-flash-preview", 
-                "gemini-2.5-flash-lite"
-            ]
-        )
-    
-    st.markdown("---")
-    # Generate button moved to the sidebar!
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- MAIN SCREEN AREA ---
@@ -179,67 +165,89 @@ if generate_btn:
     
     st.markdown("---")
     
-    with st.status(f"🤖 **{selected_model} is researching and routing your dossier...**", expanded=True) as status:
+    with st.status("🤖 **Master AI is researching and routing your dossier...**", expanded=True) as status:
         st.write("🔍 Searching the live internet for up-to-date logistics...")
         st.write("🏨 Scouting accommodations that match your budget...")
         st.write("🗺️ Organizing tabs and formatting photography...")
         
-        try:
-            master_agent = Agent(
-                name="Master Travel Architect",
-                role="Expert Travel Planner",
-                instructions=[
-                    f"You are building a complete {num_days}-day travel dossier for {destination} in {travel_month}.",
-                    f"The traveler is a '{traveler_persona}' on a '{budget}' budget.",
-                    f"CRITICAL RULES: The user requested these specific preferences: '{user_preferences}'. Your ENTIRE itinerary must revolve around these preferences.",
-                    "USE YOUR WEB SEARCH TOOL to find up-to-date information on visas, currently open hotels, and real-time logistics.",
-                    "---",
-                    "CRITICAL FORMATTING RULE FOR TABS:",
-                    "You MUST divide your document into 3 distinct sections using EXACTLY this text separator on its own line: `---TAB_SEPARATOR---`",
-                    "If you do not use `---TAB_SEPARATOR---` exactly twice, the app will break.",
-                    "---",
-                    "## 🛂 Part 1: Logistics & Practicalities",
-                    "- **Flight & Airports:** Major entry points.",
-                    "- **Weather:** What to pack for this month.",
-                    "- **Transport:** Best way to get around.",
-                    "- **Etiquette:** 3 local rules to respect.",
-                    "",
-                    "---TAB_SEPARATOR---",
-                    "",
-                    "## 🏨 Part 2: Top Accommodation Picks",
-                    "- Provide 3 currently operating hotel recommendations fitting the budget and preferences.",
-                    "- For EVERY hotel, you MUST include a photo and map link using this exact layout:",
-                    "  ### 🏨 [Hotel Name]",
-                    "  **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
-                    "  <br><br>",
-                    "  <img src=\"https://image.pollinations.ai/prompt/Hotel+Name+City+Exterior+Photography\">",
-                    "  <br><br>",
-                    "  *Write a short explanation of why this fits the user.*",
-                    "",
-                    "---TAB_SEPARATOR---",
-                    "",
-                    "## 🗓️ Part 3: The Day-by-Day Itinerary",
-                    "Create a detailed day-by-day schedule. Include top tourist attractions, historical sites, natural attractions, and hidden gems. Group them geographically.",
-                    "Break each day into Morning, Afternoon, and Evening.",
-                    "For EVERY single location or restaurant, you MUST use this exact layout:",
-                    "### 📍 [Name of Location]",
-                    "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
-                    "<br><br>",
-                    "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City+Tourism+Photography\">",
-                    "<br><br>",
-                    "*Write a short, engaging description.*",
-                    "",
-                    "> 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
-                    "",
-                    "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!"
-                ],
-                model=Gemini(id=selected_model), # Uses the model you selected in the dropdown!
-                tools=[SerpApiTools(api_key=SERPAPI_KEY)],
-            )
+        # Priority list of models to automatically cascade through
+        fallback_models = ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash-lite"]
+        
+        success = False
+        raw_content = ""
+        last_error = ""
+        
+        for model_id in fallback_models:
+            try:
+                st.write(f"⚙️ Attempting generation with `{model_id}`...")
+                master_agent = Agent(
+                    name="Master Travel Architect",
+                    role="Expert Travel Planner",
+                    instructions=[
+                        f"You are building a complete {num_days}-day travel dossier for {destination} in {travel_month}.",
+                        f"The traveler is a '{traveler_persona}' on a '{budget}' budget.",
+                        f"CRITICAL RULES: The user requested these specific preferences: '{user_preferences}'. Your ENTIRE itinerary must revolve around these preferences.",
+                        "USE YOUR WEB SEARCH TOOL to find up-to-date information on visas, currently open hotels, and real-time logistics.",
+                        "---",
+                        "CRITICAL FORMATTING RULE FOR TABS:",
+                        "You MUST divide your document into 3 distinct sections using EXACTLY this text separator on its own line: `---TAB_SEPARATOR---`",
+                        "If you do not use `---TAB_SEPARATOR---` exactly twice, the app will break.",
+                        "---",
+                        "## 🛂 Part 1: Logistics & Practicalities",
+                        "- **Flight & Airports:** Major entry points.",
+                        "- **Weather:** What to pack for this month.",
+                        "- **Transport:** Best way to get around.",
+                        "- **Etiquette:** 3 local rules to respect.",
+                        "",
+                        "---TAB_SEPARATOR---",
+                        "",
+                        "## 🏨 Part 2: Top Accommodation Picks",
+                        "- Provide 3 currently operating hotel recommendations fitting the budget and preferences.",
+                        "- For EVERY hotel, you MUST include a photo and map link using this exact layout:",
+                        "  ### 🏨 [Hotel Name]",
+                        "  **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
+                        "  <br><br>",
+                        "  <img src=\"https://image.pollinations.ai/prompt/Hotel+Name+City+Exterior+Photography\">",
+                        "  <br><br>",
+                        "  *Write a short explanation of why this fits the user.*",
+                        "",
+                        "---TAB_SEPARATOR---",
+                        "",
+                        "## 🗓️ Part 3: The Day-by-Day Itinerary",
+                        "Create a detailed day-by-day schedule. Include top tourist attractions, historical sites, natural attractions, and hidden gems. Group them geographically.",
+                        "Break each day into Morning, Afternoon, and Evening.",
+                        "For EVERY single location or restaurant, you MUST use this exact layout:",
+                        "### 📍 [Name of Location]",
+                        "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
+                        "<br><br>",
+                        "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City+Tourism+Photography\">",
+                        "<br><br>",
+                        "*Write a short, engaging description.*",
+                        "",
+                        "> 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
+                        "",
+                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!"
+                    ],
+                    model=Gemini(id=model_id),
+                    tools=[SerpApiTools(api_key=SERPAPI_KEY)],
+                )
 
-            prompt = f"Use your web search tools to generate the comprehensive, up-to-date {num_days}-day travel dossier for {destination}."
-            response = master_agent.run(prompt, stream=False)
-            
+                prompt = f"Use your web search tools to generate the comprehensive, up-to-date {num_days}-day travel dossier for {destination}."
+                response = master_agent.run(prompt, stream=False)
+                
+                # If we made it here without an error, the generation was successful!
+                raw_content = response.content
+                success = True
+                break # Break out of the fallback loop
+                
+            except Exception as e:
+                # Catch the error, notify the UI, and let the loop continue to the next model
+                last_error = str(e)
+                st.write(f"⚠️ `{model_id}` limit reached or failed. Automatically switching to next available engine...")
+                time.sleep(1) # Brief pause before trying the next model
+                continue
+                
+        if success:
             status.update(label="✅ **Master Dossier Complete!**", state="complete", expanded=False)
             
             # Celebratory Animations
@@ -247,7 +255,6 @@ if generate_btn:
             st.toast('Your custom itinerary has been successfully generated!', icon='🎉')
             
             # Tabbed Navigation
-            raw_content = response.content
             parts = raw_content.split("---TAB_SEPARATOR---")
             
             if len(parts) >= 3:
@@ -297,7 +304,8 @@ if generate_btn:
                     height=50
                 )
                 
-        except Exception as e:
-            status.update(label="❌ Error occurred", state="error")
-            st.error(f"🚨 Engine Error ({selected_model}): {str(e)}")
-            st.info("💡 **Pro Tip:** You probably hit your daily limit for this specific model. Open '🛠️ Advanced Settings' in the sidebar on the left, change the AI Engine to a different model, and click Generate again!")
+        else:
+            # If all 3 models failed, show the error state
+            status.update(label="❌ **Generation Failed**", state="error", expanded=True)
+            st.error("🚨 All available AI engines have hit their daily limit. Please try again tomorrow after your quota resets.")
+            st.info(f"Last Error Received: {last_error}")
