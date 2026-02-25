@@ -118,7 +118,6 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.caption("⚡ Multi-Agent Mode enabled (Uses 4 API requests per generation)")
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- MAIN SCREEN AREA ---
@@ -235,7 +234,7 @@ if generate_btn:
                     instructions=[
                         f"You are the Hotel Concierge for a trip to {destination}.",
                         f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
-                        "Generate ONLY 3 highly-rated hotel recommendations.",
+                        "Generate ONLY 3 highly-rated hotel recommendations based on the provided itinerary.",
                         "For EVERY hotel, you MUST use this exact layout:",
                         "### 🏨 [Hotel Name]",
                         "**[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
@@ -246,7 +245,7 @@ if generate_btn:
                         "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS."
                     ]
                 )
-                hotel_content = hotel_agent.run(f"Find 3 hotels in {destination}.", stream=False).content
+                hotel_content = hotel_agent.run(f"Find 3 highly-rated hotels in {destination} that are geographically convenient based on this itinerary:\n\n{itinerary_content}", stream=False).content
 
                 # ==========================================
                 # AGENT 3: LOGISTICS EXPERT
