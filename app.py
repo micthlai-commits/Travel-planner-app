@@ -118,6 +118,7 @@ with st.sidebar:
     )
     
     st.markdown("---")
+    st.caption("⚡ Multi-Agent Mode enabled (Uses 4 API requests per generation)")
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- MAIN SCREEN AREA ---
@@ -170,11 +171,8 @@ if generate_btn:
     
     st.markdown("---")
     
-    with st.status("🤖 **Master AI is researching and routing your dossier...**", expanded=True) as status:
-        st.write("🔍 Initializing agent models...")
+    with st.status("🤖 **4-Agent Architecture is researching and routing your dossier...**", expanded=True) as status:
         
-        # Priority list of models to automatically cascade through. 
-        # Added Gemma-3 as the ultimate 14,400-request failsafe!
         fallback_models = [
             "gemini-2.5-flash", 
             "gemini-3-flash-preview", 
@@ -188,7 +186,7 @@ if generate_btn:
         
         for model_id in fallback_models:
             try:
-                st.write(f"⚙️ Attempting generation with `{model_id}`...")
+                st.write(f"⚙️ Initializing Engine: `{model_id}`...")
                 
                 # Failsafe Logic: If we are forced to use Gemma, we MUST disable the search tools to prevent a crash
                 agent_tools = []
@@ -196,23 +194,21 @@ if generate_btn:
                     agent_tools = [SerpApiTools(api_key=SYSTEM_SERPAPI_KEY)]
                 
                 if "gemma" in model_id:
-                    st.warning("⚠️ High Traffic: Live web search disabled. Generating itinerary using AI's offline memory (Data accurate up to Aug 2024).")
+                    st.warning("⚠️ High Traffic: Live web search disabled. Generating itinerary using AI's offline memory.")
 
-                master_agent = Agent(
-                    name="Master Travel Architect",
-                    role="Expert Travel Planner",
+                # ==========================================
+                # AGENT 1: ITINERARY PLANNER
+                # ==========================================
+                st.write("🗺️ **Agent 1 (Itinerary Planner)** is designing the daily schedule...")
+                itinerary_agent = Agent(
+                    name="Itinerary Planner",
+                    role="Expert day-by-day scheduler",
+                    model=Gemini(id=model_id),
+                    tools=agent_tools,
                     instructions=[
-                        f"You are building a complete {num_days}-day travel dossier for {destination} in {travel_month}.",
-                        f"The traveler is a '{traveler_persona}' on a '{budget}' budget.",
-                        f"CRITICAL RULES: The user requested these specific preferences: '{user_preferences}'. Your ENTIRE itinerary must revolve around these preferences.",
-                        "If you have access to search tools, find up-to-date information on visas and logistics. If not, use your best internal knowledge.",
-                        "---",
-                        "CRITICAL FORMATTING RULE FOR TABS:",
-                        "You MUST divide your document into 3 distinct sections using EXACTLY this text separator on its own line: `---TAB_SEPARATOR---`",
-                        "If you do not use `---TAB_SEPARATOR---` exactly twice, the app will break.",
-                        "---",
-                        "## 🗓️ Part 1: The Day-by-Day Itinerary",
-                        "Create a detailed day-by-day schedule. Include top tourist attractions, historical sites, natural attractions, and hidden gems. Group them geographically.",
+                        f"You are the Itinerary Planner for a {num_days}-day trip to {destination} in {travel_month}.",
+                        f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
+                        "Generate ONLY the day-by-day schedule. Group locations geographically.",
                         "Break each day into Morning, Afternoon, and Evening.",
                         "For EVERY single location or restaurant, you MUST use this exact layout:",
                         "### 📍 [Name of Location]",
@@ -221,48 +217,91 @@ if generate_btn:
                         "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City+Tourism+Photography\">",
                         "<br><br>",
                         "*Write a short, engaging description.*",
-                        "",
-                        "> 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
-                        "",
-                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!",
-                        "",
-                        "---TAB_SEPARATOR---",
-                        "",
-                        "## 🏨 Part 2: Top Accommodation Picks",
-                        "- Provide 3 highly-rated hotel recommendations fitting the budget and preferences.",
-                        "- For EVERY hotel, you MUST include a photo and map link using this exact layout:",
-                        "  ### 🏨 [Hotel Name]",
-                        "  **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
-                        "  <br><br>",
-                        "  <img src=\"https://image.pollinations.ai/prompt/Hotel+Name+City+Exterior+Photography\">",
-                        "  <br><br>",
-                        "  *Write a short explanation of why this fits the user.*",
-                        "",
-                        "---TAB_SEPARATOR---",
-                        "",
-                        "## 🛂 Part 3: Logistics & Practicalities",
+                        "> 🚊 **Transit to next location:** [e.g., 15 mins by subway/bus] | **Route:** From [Nearest Station/Stop of CURRENT location] to [Nearest Station/Stop of NEXT location]",
+                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS."
+                    ]
+                )
+                itinerary_content = itinerary_agent.run(f"Create the day-by-day itinerary for {destination}.", stream=False).content
+
+                # ==========================================
+                # AGENT 2: HOTEL CONCIERGE
+                # ==========================================
+                st.write("🏨 **Agent 2 (Hotel Concierge)** is scouting top accommodations...")
+                hotel_agent = Agent(
+                    name="Hotel Concierge",
+                    role="Accommodation Expert",
+                    model=Gemini(id=model_id),
+                    tools=agent_tools,
+                    instructions=[
+                        f"You are the Hotel Concierge for a trip to {destination}.",
+                        f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
+                        "Generate ONLY 3 highly-rated hotel recommendations.",
+                        "For EVERY hotel, you MUST use this exact layout:",
+                        "### 🏨 [Hotel Name]",
+                        "**[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
+                        "<br><br>",
+                        "<img src=\"https://image.pollinations.ai/prompt/Hotel+Name+City+Exterior+Photography\">",
+                        "<br><br>",
+                        "*Write a short explanation of why this fits the user.*",
+                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS."
+                    ]
+                )
+                hotel_content = hotel_agent.run(f"Find 3 hotels in {destination}.", stream=False).content
+
+                # ==========================================
+                # AGENT 3: LOGISTICS EXPERT
+                # ==========================================
+                st.write("🛂 **Agent 3 (Logistics Expert)** is gathering practical information...")
+                logistics_agent = Agent(
+                    name="Logistics Expert",
+                    role="Practicalities Researcher",
+                    model=Gemini(id=model_id),
+                    tools=agent_tools,
+                    instructions=[
+                        f"You are the Logistics Expert for a trip to {destination} in {travel_month}.",
+                        "Generate ONLY practical logistics and local rules.",
+                        "Use these exact bullet points:",
                         "- **Flight & Airports:** Major entry points.",
                         "- **Weather:** What to pack for this month.",
                         "- **Transport:** Best way to get around.",
                         "- **Etiquette:** 3 local rules to respect."
-                    ],
-                    model=Gemini(id=model_id),
-                    tools=agent_tools,
+                    ]
                 )
+                logistics_content = logistics_agent.run(f"Gather logistics for {destination}.", stream=False).content
 
-                prompt = f"Generate the comprehensive {num_days}-day travel dossier for {destination}."
-                response = master_agent.run(prompt, stream=False)
+                # ==========================================
+                # AGENT 4: CHIEF EDITOR
+                # ==========================================
+                st.write("✍️ **Agent 4 (Chief Editor)** is personalizing the final dossier...")
+                editor_agent = Agent(
+                    name="Chief Editor",
+                    role="Travel Document Polisher",
+                    model=Gemini(id=model_id),
+                    instructions=[
+                        f"You are the Chief Editor finalizing a travel plan for a {traveler_persona} traveling to {destination}.",
+                        f"Their budget is {budget} and their preferences are: '{user_preferences}'.",
+                        "Write a short, engaging, 1-paragraph 'Executive Welcome' that personally addresses the traveler and summarizes why this itinerary is perfect for them."
+                    ]
+                )
+                summary_content = editor_agent.run(f"Write the Executive Welcome based on this itinerary: {itinerary_content}", stream=False).content
+
+                # ==========================================
+                # PYTHON TAB COMPILER
+                # ==========================================
+                # We compile the tabs using Python to guarantee the separators never break
+                raw_content = f"### 📝 Editor's Welcome\n{summary_content}\n\n{itinerary_content}\n\n" \
+                              f"---TAB_SEPARATOR---\n\n" \
+                              f"## 🏨 Part 2: Top Accommodation Picks\n{hotel_content}\n\n" \
+                              f"---TAB_SEPARATOR---\n\n" \
+                              f"## 🛂 Part 3: Logistics & Practicalities\n{logistics_content}"
                 
-                # If we made it here without an error, the generation was successful!
-                raw_content = response.content
                 success = True
-                break # Break out of the fallback loop
+                break # Break out of the fallback loop if all 4 agents succeeded!
                 
             except Exception as e:
-                # Catch the error, notify the UI, and let the loop continue to the next model
                 last_error = str(e)
-                st.write(f"⚠️ `{model_id}` unavailable or limit reached. Automatically switching to next engine...")
-                time.sleep(1) # Brief pause before trying the next model
+                st.write(f"⚠️ `{model_id}` unavailable or limit reached. Switching to next engine...")
+                time.sleep(1)
                 continue
                 
         if success:
@@ -272,7 +311,7 @@ if generate_btn:
             st.balloons()
             st.toast('Your custom itinerary has been successfully generated!', icon='🎉')
             
-            # Tabbed Navigation
+            # Tabbed Navigation (Automatically defaults to Tab 1: Itinerary)
             parts = raw_content.split("---TAB_SEPARATOR---")
             
             if len(parts) >= 3:
