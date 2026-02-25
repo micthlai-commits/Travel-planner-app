@@ -86,17 +86,11 @@ LOCAL_GOOGLE_KEY = ""
 # 👆 ------------------------------------------------ 👆
 
 try:
-    SERPAPI_KEY = st.secrets["SERPAPI_KEY"] 
-    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"] 
+    SYSTEM_SERPAPI_KEY = st.secrets["SERPAPI_KEY"] 
+    SYSTEM_GOOGLE_KEY = st.secrets["GOOGLE_API_KEY"] 
 except Exception:
-    SERPAPI_KEY = LOCAL_SERPAPI_KEY
-    GOOGLE_API_KEY = LOCAL_GOOGLE_KEY
-
-os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
-
-if not GOOGLE_API_KEY or not SERPAPI_KEY:
-    st.error("🚨 API Keys missing! Please check Streamlit Secrets.")
-    st.stop()
+    SYSTEM_SERPAPI_KEY = LOCAL_SERPAPI_KEY
+    SYSTEM_GOOGLE_KEY = LOCAL_GOOGLE_KEY
 
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
@@ -121,7 +115,16 @@ with st.sidebar:
     )
     
     st.markdown("---")
+    with st.expander("🔑 Bring Your Own Key (Optional)"):
+        st.caption("If the main app quota is exhausted, paste your own free Google API key here to keep generating!")
+        user_google_key = st.text_input("Google AI Key:", type="password")
+    
+    st.markdown("---")
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
+
+# Set the active API key based on whether the user provided one, or fall back to the system key
+ACTIVE_GOOGLE_KEY = user_google_key if user_google_key else SYSTEM_GOOGLE_KEY
+os.environ["GOOGLE_API_KEY"] = ACTIVE_GOOGLE_KEY
 
 # --- MAIN SCREEN AREA ---
 
@@ -150,6 +153,10 @@ if not generate_btn:
 
 # Active State: Itinerary Generation
 if generate_btn:
+    if not ACTIVE_GOOGLE_KEY:
+        st.error("🚨 API Key missing! Please provide a key in the sidebar or check Streamlit Secrets.")
+        st.stop()
+
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{destination.upper()}</h1>', unsafe_allow_html=True)
     
     # Hero Banner
@@ -166,12 +173,16 @@ if generate_btn:
     st.markdown("---")
     
     with st.status("🤖 **Master AI is researching and routing your dossier...**", expanded=True) as status:
-        st.write("🔍 Searching the live internet for up-to-date logistics...")
-        st.write("🏨 Scouting accommodations that match your budget...")
-        st.write("🗺️ Organizing tabs and formatting photography...")
+        st.write("🔍 Initializing agent models...")
         
-        # Priority list of models to automatically cascade through
-        fallback_models = ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash-lite"]
+        # Priority list of models to automatically cascade through. 
+        # Added Gemma-3 as the ultimate 14,400-request failsafe!
+        fallback_models = [
+            "gemini-2.5-flash", 
+            "gemini-3-flash-preview", 
+            "gemini-2.5-flash-lite",
+            "gemma-3-27b-it" 
+        ]
         
         success = False
         raw_content = ""
@@ -180,6 +191,15 @@ if generate_btn:
         for model_id in fallback_models:
             try:
                 st.write(f"⚙️ Attempting generation with `{model_id}`...")
+                
+                # Failsafe Logic: If we are forced to use Gemma, we MUST disable the search tools to prevent a crash
+                agent_tools = []
+                if "gemma" not in model_id and SYSTEM_SERPAPI_KEY:
+                    agent_tools = [SerpApiTools(api_key=SYSTEM_SERPAPI_KEY)]
+                
+                if "gemma" in model_id:
+                    st.warning("⚠️ High Traffic: Live web search disabled. Generating itinerary using AI's offline memory (Data accurate up to Aug 2024).")
+
                 master_agent = Agent(
                     name="Master Travel Architect",
                     role="Expert Travel Planner",
@@ -187,7 +207,7 @@ if generate_btn:
                         f"You are building a complete {num_days}-day travel dossier for {destination} in {travel_month}.",
                         f"The traveler is a '{traveler_persona}' on a '{budget}' budget.",
                         f"CRITICAL RULES: The user requested these specific preferences: '{user_preferences}'. Your ENTIRE itinerary must revolve around these preferences.",
-                        "USE YOUR WEB SEARCH TOOL to find up-to-date information on visas, currently open hotels, and real-time logistics.",
+                        "If you have access to search tools, find up-to-date information on visas and logistics. If not, use your best internal knowledge.",
                         "---",
                         "CRITICAL FORMATTING RULE FOR TABS:",
                         "You MUST divide your document into 3 distinct sections using EXACTLY this text separator on its own line: `---TAB_SEPARATOR---`",
@@ -202,7 +222,7 @@ if generate_btn:
                         "---TAB_SEPARATOR---",
                         "",
                         "## 🏨 Part 2: Top Accommodation Picks",
-                        "- Provide 3 currently operating hotel recommendations fitting the budget and preferences.",
+                        "- Provide 3 highly-rated hotel recommendations fitting the budget and preferences.",
                         "- For EVERY hotel, you MUST include a photo and map link using this exact layout:",
                         "  ### 🏨 [Hotel Name]",
                         "  **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
@@ -229,10 +249,10 @@ if generate_btn:
                         "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!"
                     ],
                     model=Gemini(id=model_id),
-                    tools=[SerpApiTools(api_key=SERPAPI_KEY)],
+                    tools=agent_tools,
                 )
 
-                prompt = f"Use your web search tools to generate the comprehensive, up-to-date {num_days}-day travel dossier for {destination}."
+                prompt = f"Generate the comprehensive {num_days}-day travel dossier for {destination}."
                 response = master_agent.run(prompt, stream=False)
                 
                 # If we made it here without an error, the generation was successful!
@@ -243,7 +263,7 @@ if generate_btn:
             except Exception as e:
                 # Catch the error, notify the UI, and let the loop continue to the next model
                 last_error = str(e)
-                st.write(f"⚠️ `{model_id}` limit reached or failed. Automatically switching to next available engine...")
+                st.write(f"⚠️ `{model_id}` unavailable or limit reached. Automatically switching to next engine...")
                 time.sleep(1) # Brief pause before trying the next model
                 continue
                 
@@ -305,7 +325,8 @@ if generate_btn:
                 )
                 
         else:
-            # If all 3 models failed, show the error state
+            # If all models failed, show the error state
             status.update(label="❌ **Generation Failed**", state="error", expanded=True)
-            st.error("🚨 All available AI engines have hit their daily limit. Please try again tomorrow after your quota resets.")
-            st.info(f"Last Error Received: {last_error}")
+            st.error("🚨 All available AI engines have hit their daily limit.")
+            st.info("💡 **Solution:** Open the '🔑 Bring Your Own Key' menu in the sidebar and paste a fresh Google API Key to continue!")
+            st.code(f"Technical Error Data: {last_error}")
