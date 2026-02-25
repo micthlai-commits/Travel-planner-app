@@ -120,12 +120,26 @@ with st.sidebar:
     )
     
     st.markdown("---")
+    
+    # NEW FEATURE: AI Engine Selector
+    with st.expander("🛠️ Advanced Settings (Quota Fix)"):
+        st.caption("If you hit an API limit, simply switch the engine below to use a fresh bucket of 20 requests!")
+        selected_model = st.selectbox(
+            "🤖 Select AI Engine:", 
+            [
+                "gemini-2.5-flash", 
+                "gemini-3-flash-preview", 
+                "gemini-2.5-flash-lite"
+            ]
+        )
+    
+    st.markdown("---")
     # Generate button moved to the sidebar!
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- MAIN SCREEN AREA ---
 
-# Empty State: Inspiration Gallery (Upgrade 3)
+# Empty State: Inspiration Gallery
 if not generate_btn:
     st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
@@ -136,17 +150,14 @@ if not generate_btn:
     gal1, gal2, gal3 = st.columns(3)
     
     with gal1:
-        # Added &h=400 to force a 3:2 aspect ratio crop for uniformity
         st.image("https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
         st.markdown("#### 🗼 Tokyo, Japan")
         st.caption("Neon lights, ancient temples, and culinary perfection.")
     with gal2:
-        # Added &h=400 to force a 3:2 aspect ratio crop for uniformity
         st.image("https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
         st.markdown("#### 🥐 Paris, France")
         st.caption("Art, romance, and café culture by the Seine.")
     with gal3:
-        # Added &h=400 to force a 3:2 aspect ratio crop for uniformity
         st.image("https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
         st.markdown("#### 🏔️ Banff, Canada")
         st.caption("Crystal lakes, towering peaks, and ultimate wilderness.")
@@ -159,7 +170,7 @@ if generate_btn:
     safe_dest = urllib.parse.quote(destination)
     st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
     
-    # Trip Summary Metric Cards (Upgrade 2)
+    # Trip Summary Metric Cards
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("📍 Destination", destination)
     m2.metric("🗓️ Duration", f"{num_days} Days ({travel_month})")
@@ -168,7 +179,7 @@ if generate_btn:
     
     st.markdown("---")
     
-    with st.status("🤖 **Master AI is researching and routing your dossier...**", expanded=True) as status:
+    with st.status(f"🤖 **{selected_model} is researching and routing your dossier...**", expanded=True) as status:
         st.write("🔍 Searching the live internet for up-to-date logistics...")
         st.write("🏨 Scouting accommodations that match your budget...")
         st.write("🗺️ Organizing tabs and formatting photography...")
@@ -222,7 +233,7 @@ if generate_btn:
                     "",
                     "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!"
                 ],
-                model=Gemini(id="gemini-3-flash-preview"),
+                model=Gemini(id=selected_model), # Uses the model you selected in the dropdown!
                 tools=[SerpApiTools(api_key=SERPAPI_KEY)],
             )
 
@@ -231,11 +242,11 @@ if generate_btn:
             
             status.update(label="✅ **Master Dossier Complete!**", state="complete", expanded=False)
             
-            # Celebratory Animations (Upgrade 4)
+            # Celebratory Animations
             st.balloons()
             st.toast('Your custom itinerary has been successfully generated!', icon='🎉')
             
-            # Tabbed Navigation (Upgrade 5)
+            # Tabbed Navigation
             raw_content = response.content
             parts = raw_content.split("---TAB_SEPARATOR---")
             
@@ -288,7 +299,5 @@ if generate_btn:
                 
         except Exception as e:
             status.update(label="❌ Error occurred", state="error")
-            if "429" in str(e) or "quota" in str(e).lower():
-                st.error("🚨 You have hit your 20-request limit for the day on this model. The quota will reset at 4:00 PM Hong Kong Time. Alternatively, switch `gemini-3-flash-preview` to `gemini-2.5-flash` in the code to use your other bucket!")
-            else:
-                st.error(f"An error occurred: {str(e)}")
+            st.error(f"🚨 Engine Error ({selected_model}): {str(e)}")
+            st.info("💡 **Pro Tip:** You probably hit your daily limit for this specific model. Open '🛠️ Advanced Settings' in the sidebar on the left, change the AI Engine to a different model, and click Generate again!")
