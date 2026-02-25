@@ -92,6 +92,9 @@ except Exception:
     SYSTEM_SERPAPI_KEY = LOCAL_SERPAPI_KEY
     SYSTEM_GOOGLE_KEY = LOCAL_GOOGLE_KEY
 
+# Set the active API key for the environment
+os.environ["GOOGLE_API_KEY"] = SYSTEM_GOOGLE_KEY
+
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
@@ -115,16 +118,7 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    with st.expander("🔑 Bring Your Own Key (Optional)"):
-        st.caption("If the main app quota is exhausted, paste your own free Google API key here to keep generating!")
-        user_google_key = st.text_input("Google AI Key:", type="password")
-    
-    st.markdown("---")
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
-
-# Set the active API key based on whether the user provided one, or fall back to the system key
-ACTIVE_GOOGLE_KEY = user_google_key if user_google_key else SYSTEM_GOOGLE_KEY
-os.environ["GOOGLE_API_KEY"] = ACTIVE_GOOGLE_KEY
 
 # --- MAIN SCREEN AREA ---
 
@@ -153,8 +147,8 @@ if not generate_btn:
 
 # Active State: Itinerary Generation
 if generate_btn:
-    if not ACTIVE_GOOGLE_KEY:
-        st.error("🚨 API Key missing! Please provide a key in the sidebar or check Streamlit Secrets.")
+    if not SYSTEM_GOOGLE_KEY:
+        st.error("🚨 API Key missing! Please check Streamlit Secrets or lines 75/76.")
         st.stop()
 
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{destination.upper()}</h1>', unsafe_allow_html=True)
@@ -328,5 +322,5 @@ if generate_btn:
             # If all models failed, show the error state
             status.update(label="❌ **Generation Failed**", state="error", expanded=True)
             st.error("🚨 All available AI engines have hit their daily limit.")
-            st.info("💡 **Solution:** Open the '🔑 Bring Your Own Key' menu in the sidebar and paste a fresh Google API Key to continue!")
+            st.info("💡 **Solution:** Please try again tomorrow after your quota resets.")
             st.code(f"Technical Error Data: {last_error}")
