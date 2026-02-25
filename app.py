@@ -113,7 +113,7 @@ with st.sidebar:
     
     user_preferences = st.text_area(
         "✍️ Custom Preferences:",
-        placeholder="E.g., I love outdoor hiking but hate crowded museums. Need a pool.",
+        placeholder="Enter your preferences...",
         height=120
     )
     
@@ -147,6 +147,10 @@ if not generate_btn:
 
 # Active State: Itinerary Generation
 if generate_btn:
+    if not destination.strip():
+        st.warning("⚠️ Please enter a destination to generate your itinerary.")
+        st.stop()
+        
     if not SYSTEM_GOOGLE_KEY:
         st.error("🚨 API Key missing! Please check Streamlit Secrets or lines 75/76.")
         st.stop()
@@ -207,11 +211,20 @@ if generate_btn:
                         "You MUST divide your document into 3 distinct sections using EXACTLY this text separator on its own line: `---TAB_SEPARATOR---`",
                         "If you do not use `---TAB_SEPARATOR---` exactly twice, the app will break.",
                         "---",
-                        "## 🛂 Part 1: Logistics & Practicalities",
-                        "- **Flight & Airports:** Major entry points.",
-                        "- **Weather:** What to pack for this month.",
-                        "- **Transport:** Best way to get around.",
-                        "- **Etiquette:** 3 local rules to respect.",
+                        "## 🗓️ Part 1: The Day-by-Day Itinerary",
+                        "Create a detailed day-by-day schedule. Include top tourist attractions, historical sites, natural attractions, and hidden gems. Group them geographically.",
+                        "Break each day into Morning, Afternoon, and Evening.",
+                        "For EVERY single location or restaurant, you MUST use this exact layout:",
+                        "### 📍 [Name of Location]",
+                        "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
+                        "<br><br>",
+                        "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City+Tourism+Photography\">",
+                        "<br><br>",
+                        "*Write a short, engaging description.*",
+                        "",
+                        "> 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
+                        "",
+                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!",
                         "",
                         "---TAB_SEPARATOR---",
                         "",
@@ -227,20 +240,11 @@ if generate_btn:
                         "",
                         "---TAB_SEPARATOR---",
                         "",
-                        "## 🗓️ Part 3: The Day-by-Day Itinerary",
-                        "Create a detailed day-by-day schedule. Include top tourist attractions, historical sites, natural attractions, and hidden gems. Group them geographically.",
-                        "Break each day into Morning, Afternoon, and Evening.",
-                        "For EVERY single location or restaurant, you MUST use this exact layout:",
-                        "### 📍 [Name of Location]",
-                        "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
-                        "<br><br>",
-                        "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City+Tourism+Photography\">",
-                        "<br><br>",
-                        "*Write a short, engaging description.*",
-                        "",
-                        "> 🚊 **Transit:** [Realistic time, e.g., 15 mins by bus] to next location",
-                        "",
-                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS. Use ONLY letters and plus signs!"
+                        "## 🛂 Part 3: Logistics & Practicalities",
+                        "- **Flight & Airports:** Major entry points.",
+                        "- **Weather:** What to pack for this month.",
+                        "- **Transport:** Best way to get around.",
+                        "- **Etiquette:** 3 local rules to respect."
                     ],
                     model=Gemini(id=model_id),
                     tools=agent_tools,
@@ -262,7 +266,7 @@ if generate_btn:
                 continue
                 
         if success:
-            status.update(label="✅ **Master Dossier Complete!**", state="complete", expanded=False)
+            status.update(label="✅ **Complete!**", state="complete", expanded=False)
             
             # Celebratory Animations
             st.balloons()
@@ -272,7 +276,7 @@ if generate_btn:
             parts = raw_content.split("---TAB_SEPARATOR---")
             
             if len(parts) >= 3:
-                tab1, tab2, tab3 = st.tabs(["🛂 Logistics & Practicalities", "🏨 Accommodations", "🗺️ Day-by-Day Itinerary"])
+                tab1, tab2, tab3 = st.tabs(["🗺️ Day-by-Day Itinerary", "🏨 Accommodations", "🛂 Logistics & Practicalities"])
                 with tab1:
                     st.markdown(parts[0], unsafe_allow_html=True)
                 with tab2:
