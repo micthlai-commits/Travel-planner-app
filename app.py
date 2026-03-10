@@ -2,7 +2,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 import urllib.parse
+import urllib.request
+import json
+import re
 import time
+import concurrent.futures
 from agno.agent import Agent
 from agno.tools.serpapi import SerpApiTools
 from agno.models.google import Gemini
@@ -80,7 +84,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 👇 PASTE YOUR KEYS INSIDE THE QUOTATION MARKS BELOW 👇
+# 👇 PASTE YOUR NEW TIER 1 KEY INSIDE THE QUOTATION MARKS BELOW 👇
 LOCAL_SERPAPI_KEY = "" 
 LOCAL_GOOGLE_KEY = "" 
 # 👆 ------------------------------------------------ 👆
@@ -94,6 +98,54 @@ except Exception:
 
 # Set the active API key for the environment
 os.environ["GOOGLE_API_KEY"] = SYSTEM_GOOGLE_KEY
+
+# --- REAL PHOTO FETCHING ENGINE ---
+def fetch_real_image(query):
+    """Fetches real photos from Wikipedia API (Free) or falls back to Pollinations."""
+    try:
+        # Step 1: Search Wikipedia for the location
+        search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&utf8=&format=json"
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'TravelPlannerApp/1.0'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            search_data = json.loads(response.read().decode())
+            if not search_data['query']['search']:
+                raise ValueError("No Wikipedia page found")
+            title = search_data['query']['search'][0]['title']
+            
+        # Step 2: Grab the main verified photo of that page
+        image_url = f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}&prop=pageimages&format=json&pithumbsize=1000"
+        req = urllib.request.Request(image_url, headers={'User-Agent': 'TravelPlannerApp/1.0'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            image_data = json.loads(response.read().decode())
+            pages = image_data['query']['pages']
+            page_id = list(pages.keys())[0]
+            if 'thumbnail' in pages[page_id]:
+                return pages[page_id]['thumbnail']['source']
+    except Exception:
+        pass
+    
+    # Fallback to realistic AI image if Wikipedia lacks a photo
+    return f"https://image.pollinations.ai/prompt/Realistic+Cinematic+Photography+of+{urllib.parse.quote(query)}?width=1000&height=500"
+
+def process_images(text):
+    """Finds all [REAL_IMG] placeholders from the AI and concurrently injects real photos."""
+    pattern = r"\[REAL_IMG:\s*(.*?)\]"
+    matches = list(set(re.findall(pattern, text)))
+    
+    if not matches:
+        return text
+        
+    def get_img_url(query):
+        return query, fetch_real_image(query)
+
+    # Fetch all images simultaneously to keep the app lightning fast
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = executor.map(get_img_url, matches)
+        
+    for query, url in results:
+        text = text.replace(f"[REAL_IMG: {query}]", url)
+        
+    return text
 
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
@@ -118,6 +170,7 @@ with st.sidebar:
     )
     
     st.markdown("---")
+    st.caption("⚡ Tier 1 Engine: Gemini 3 Flash (Parallel + Real Photos)")
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- MAIN SCREEN AREA ---
@@ -170,13 +223,13 @@ if generate_btn:
     
     st.markdown("---")
     
-    with st.status("🤖 **4-Agent Architecture is researching and routing your dossier...**", expanded=True) as status:
+    with st.status("🤖 **Gemini 3 Flash is researching in parallel...**", expanded=True) as status:
         
         fallback_models = [
-            "gemini-2.5-flash", 
-            "gemini-3-flash-preview", 
-            "gemini-2.5-flash-lite",
-            "gemma-3-27b-it" 
+            "gemini-3-flash-preview",        # Your chosen primary model
+            "gemini-3.1-flash-lite-preview", # ⚡ NEW: 3.1 Flash Lite speed backup
+            "gemini-2.5-flash",              # Highly reliable backup
+            "gemma-3-27b-it"                 # Offline failsafe
         ]
         
         success = False
@@ -185,109 +238,110 @@ if generate_btn:
         
         for model_id in fallback_models:
             try:
-                st.write(f"⚙️ Initializing Engine: `{model_id}`...")
+                st.write(f"⚙️ Initializing High-Speed Engine: `{model_id}`...")
                 
-                # Failsafe Logic: If we are forced to use Gemma, we MUST disable the search tools to prevent a crash
                 agent_tools = []
                 if "gemma" not in model_id and SYSTEM_SERPAPI_KEY:
                     agent_tools = [SerpApiTools(api_key=SYSTEM_SERPAPI_KEY)]
                 
-                if "gemma" in model_id:
-                    st.warning("⚠️ High Traffic: Live web search disabled. Generating itinerary using AI's offline memory.")
+                # --- DEFINE PARALLEL FUNCTIONS ---
+                def get_itinerary():
+                    agent = Agent(
+                        name="Itinerary Planner",
+                        model=Gemini(id=model_id),
+                        tools=agent_tools,
+                        instructions=[
+                            f"You are the Itinerary Planner for a {num_days}-day trip to {destination} in {travel_month}.",
+                            f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
+                            "Generate ONLY the day-by-day schedule. Group locations geographically.",
+                            "Break each day into Morning, Afternoon, and Evening.",
+                            "For EVERY single location or restaurant, you MUST use this exact layout:",
+                            "### 📍 [Name of Location]",
+                            "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
+                            "<br><br>",
+                            "<img src=\"[REAL_IMG: Location Name, City]\">",
+                            "<br><br>",
+                            "*Write a short, engaging description.*",
+                            "> 🚊 **Transit to next location:** [e.g., 15 mins by subway/bus] | **Route:** From [Nearest Station/Stop of CURRENT location] to [Nearest Station/Stop of NEXT location]",
+                            "CRITICAL IMAGE RULE: You MUST use the exact syntax <img src=\"[REAL_IMG: Location Name, City]\"> for images."
+                        ]
+                    )
+                    return agent.run(f"Create the day-by-day itinerary for {destination}.", stream=False).content
 
-                # ==========================================
-                # AGENT 1: ITINERARY PLANNER
-                # ==========================================
-                st.write("🗺️ **Agent 1 (Itinerary Planner)** is designing the daily schedule...")
-                itinerary_agent = Agent(
-                    name="Itinerary Planner",
-                    role="Expert day-by-day scheduler",
-                    model=Gemini(id=model_id),
-                    tools=agent_tools,
-                    instructions=[
-                        f"You are the Itinerary Planner for a {num_days}-day trip to {destination} in {travel_month}.",
-                        f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
-                        "Generate ONLY the day-by-day schedule. Group locations geographically.",
-                        "Break each day into Morning, Afternoon, and Evening.",
-                        "For EVERY single location or restaurant, you MUST use this exact layout:",
-                        "### 📍 [Name of Location]",
-                        "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
-                        "<br><br>",
-                        "<img src=\"https://image.pollinations.ai/prompt/Location+Name+City+Tourism+Photography\">",
-                        "<br><br>",
-                        "*Write a short, engaging description.*",
-                        "> 🚊 **Transit to next location:** [e.g., 15 mins by subway/bus] | **Route:** From [Nearest Station/Stop of CURRENT location] to [Nearest Station/Stop of NEXT location]",
-                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS."
-                    ]
-                )
-                itinerary_content = itinerary_agent.run(f"Create the day-by-day itinerary for {destination}.", stream=False).content
+                def get_logistics():
+                    agent = Agent(
+                        name="Logistics Expert",
+                        model=Gemini(id=model_id),
+                        tools=agent_tools,
+                        instructions=[
+                            f"You are the Logistics Expert for a trip to {destination} in {travel_month}.",
+                            "Generate ONLY practical logistics and local rules.",
+                            "Use these exact bullet points:",
+                            "- **Flight & Airports:** Major entry points.",
+                            "- **Weather:** What to pack for this month.",
+                            "- **Transport:** Best way to get around.",
+                            "- **Etiquette:** 3 local rules to respect."
+                        ]
+                    )
+                    return agent.run(f"Gather logistics for {destination}.", stream=False).content
 
-                # ==========================================
-                # AGENT 2: HOTEL CONCIERGE
-                # ==========================================
-                st.write("🏨 **Agent 2 (Hotel Concierge)** is scouting top accommodations...")
-                hotel_agent = Agent(
-                    name="Hotel Concierge",
-                    role="Accommodation Expert",
-                    model=Gemini(id=model_id),
-                    tools=agent_tools,
-                    instructions=[
-                        f"You are the Hotel Concierge for a trip to {destination}.",
-                        f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
-                        "Generate ONLY 3 highly-rated hotel recommendations based on the provided itinerary.",
-                        "For EVERY hotel, you MUST use this exact layout:",
-                        "### 🏨 [Hotel Name]",
-                        "**[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
-                        "<br><br>",
-                        "<img src=\"https://image.pollinations.ai/prompt/Hotel+Name+City+Exterior+Photography\">",
-                        "<br><br>",
-                        "*Write a short explanation of why this fits the user.*",
-                        "CRITICAL IMAGE RULE: For all `<img src=\"...\">` tags, replace spaces with a plus sign `+` and REMOVE ALL SPECIAL CHARACTERS."
-                    ]
-                )
-                hotel_content = hotel_agent.run(f"Find 3 highly-rated hotels in {destination} that are geographically convenient based on this itinerary:\n\n{itinerary_content}", stream=False).content
+                def get_hotels(itin_text):
+                    agent = Agent(
+                        name="Hotel Concierge",
+                        model=Gemini(id=model_id),
+                        tools=agent_tools,
+                        instructions=[
+                            f"You are the Hotel Concierge for a trip to {destination}.",
+                            f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
+                            "Generate ONLY 3 highly-rated hotel recommendations based on the provided itinerary.",
+                            "For EVERY hotel, you MUST use this exact layout:",
+                            "### 🏨 [Hotel Name]",
+                            "**[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
+                            "<br><br>",
+                            "<img src=\"[REAL_IMG: Hotel Name, City]\">",
+                            "<br><br>",
+                            "*Write a short explanation of why this fits the user.*",
+                            "CRITICAL IMAGE RULE: You MUST use the exact syntax <img src=\"[REAL_IMG: Hotel Name, City]\"> for images."
+                        ]
+                    )
+                    return agent.run(f"Find 3 highly-rated hotels in {destination} that are geographically convenient based on this itinerary:\n\n{itin_text}", stream=False).content
 
-                # ==========================================
-                # AGENT 3: LOGISTICS EXPERT
-                # ==========================================
-                st.write("🛂 **Agent 3 (Logistics Expert)** is gathering practical information...")
-                logistics_agent = Agent(
-                    name="Logistics Expert",
-                    role="Practicalities Researcher",
-                    model=Gemini(id=model_id),
-                    tools=agent_tools,
-                    instructions=[
-                        f"You are the Logistics Expert for a trip to {destination} in {travel_month}.",
-                        "Generate ONLY practical logistics and local rules.",
-                        "Use these exact bullet points:",
-                        "- **Flight & Airports:** Major entry points.",
-                        "- **Weather:** What to pack for this month.",
-                        "- **Transport:** Best way to get around.",
-                        "- **Etiquette:** 3 local rules to respect."
-                    ]
-                )
-                logistics_content = logistics_agent.run(f"Gather logistics for {destination}.", stream=False).content
+                def get_editor(itin_text):
+                    agent = Agent(
+                        name="Chief Editor",
+                        model=Gemini(id=model_id),
+                        instructions=[
+                            f"You are the Chief Editor finalizing a travel plan for a {traveler_persona} traveling to {destination}.",
+                            f"Their budget is {budget} and their preferences are: '{user_preferences}'.",
+                            "Write a short, engaging, 1-paragraph 'Executive Welcome' that personally addresses the traveler and summarizes why this itinerary is perfect for them."
+                        ]
+                    )
+                    return agent.run(f"Write the Executive Welcome based on this itinerary: {itin_text}", stream=False).content
 
-                # ==========================================
-                # AGENT 4: CHIEF EDITOR
-                # ==========================================
-                st.write("✍️ **Agent 4 (Chief Editor)** is personalizing the final dossier...")
-                editor_agent = Agent(
-                    name="Chief Editor",
-                    role="Travel Document Polisher",
-                    model=Gemini(id=model_id),
-                    instructions=[
-                        f"You are the Chief Editor finalizing a travel plan for a {traveler_persona} traveling to {destination}.",
-                        f"Their budget is {budget} and their preferences are: '{user_preferences}'.",
-                        "Write a short, engaging, 1-paragraph 'Executive Welcome' that personally addresses the traveler and summarizes why this itinerary is perfect for them."
-                    ]
-                )
-                summary_content = editor_agent.run(f"Write the Executive Welcome based on this itinerary: {itinerary_content}", stream=False).content
+                # --- EXECUTE IN PARALLEL THREADS ---
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    st.write("🚀 **Phase 1:** Planning Itinerary & Logistics simultaneously...")
+                    future_itin = executor.submit(get_itinerary)
+                    future_logistics = executor.submit(get_logistics)
+                    
+                    itinerary_content = future_itin.result()
+                    logistics_content = future_logistics.result()
+                    
+                    st.write("🚀 **Phase 2:** Scouting Hotels & Writing Welcome simultaneously...")
+                    future_hotel = executor.submit(get_hotels, itinerary_content)
+                    future_editor = executor.submit(get_editor, itinerary_content)
+                    
+                    hotel_content = future_hotel.result()
+                    summary_content = future_editor.result()
+                    
+                    st.write("📸 **Phase 3:** Fetching Real Verified Photography...")
+                    future_itin_img = executor.submit(process_images, itinerary_content)
+                    future_hotel_img = executor.submit(process_images, hotel_content)
+                    
+                    itinerary_content = future_itin_img.result()
+                    hotel_content = future_hotel_img.result()
 
-                # ==========================================
-                # PYTHON TAB COMPILER
-                # ==========================================
-                # We compile the tabs using Python to guarantee the separators never break
+                # --- PYTHON TAB COMPILER ---
                 raw_content = f"### 📝 Editor's Welcome\n{summary_content}\n\n{itinerary_content}\n\n" \
                               f"---TAB_SEPARATOR---\n\n" \
                               f"## 🏨 Part 2: Top Accommodation Picks\n{hotel_content}\n\n" \
@@ -295,11 +349,11 @@ if generate_btn:
                               f"## 🛂 Part 3: Logistics & Practicalities\n{logistics_content}"
                 
                 success = True
-                break # Break out of the fallback loop if all 4 agents succeeded!
+                break # Break out of the fallback loop if successful!
                 
             except Exception as e:
                 last_error = str(e)
-                st.write(f"⚠️ `{model_id}` unavailable or limit reached. Switching to next engine...")
+                st.write(f"⚠️ `{model_id}` error. Switching to next engine...")
                 time.sleep(1)
                 continue
                 
