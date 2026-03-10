@@ -170,7 +170,6 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.caption("⚡ Tier 1 Engine: Gemini 3 Flash (Parallel + Real Photos)")
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- MAIN SCREEN AREA ---
@@ -223,7 +222,8 @@ if generate_btn:
     
     st.markdown("---")
     
-    with st.status("🤖 **Gemini 3 Flash is researching in parallel...**", expanded=True) as status:
+    status_container = st.empty()
+    with status_container.status("🤖 **Gemini 3 Flash is researching in parallel...**", expanded=True) as status:
         
         fallback_models = [
             "gemini-3-flash-preview",        # Your chosen primary model
@@ -358,7 +358,7 @@ if generate_btn:
                 continue
                 
         if success:
-            status.update(label="✅ **Complete!**", state="complete", expanded=False)
+            status_container.empty() # This makes the entire loading box instantly vanish!
             
             # Celebratory Animations
             st.balloons()
