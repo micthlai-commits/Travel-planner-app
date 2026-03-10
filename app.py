@@ -14,6 +14,16 @@ from agno.models.google import Gemini
 # --- CONFIGURATION & SECRETS ---
 st.set_page_config(page_title="Academic Travel Planner", layout="wide", page_icon="✈️", initial_sidebar_state="expanded")
 
+# --- INITIALIZE SESSION STATE ---
+if 'itinerary_data' not in st.session_state:
+    st.session_state.itinerary_data = None
+if 'dest_name' not in st.session_state:
+    st.session_state.dest_name = ""
+if 'trip_params' not in st.session_state:
+    st.session_state.trip_params = {}
+if 'celebrated' not in st.session_state:
+    st.session_state.celebrated = False
+
 # --- CUSTOM CSS FOR PREMIUM UI & PDF PRINTING ---
 st.markdown("""
 <style>
@@ -172,10 +182,30 @@ with st.sidebar:
     st.markdown("---")
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
+# --- INPUT VALIDATION & STATE RESET ---
+if generate_btn:
+    if not destination.strip():
+        st.sidebar.warning("⚠️ Please enter a destination.")
+        st.stop()
+    if not SYSTEM_GOOGLE_KEY:
+        st.sidebar.error("🚨 API Key missing!")
+        st.stop()
+        
+    # Clear old data and prepare for new generation
+    st.session_state.itinerary_data = None
+    st.session_state.celebrated = False
+    st.session_state.dest_name = destination
+    st.session_state.trip_params = {
+        "days": num_days,
+        "month": travel_month,
+        "budget": budget,
+        "persona": traveler_persona
+    }
+
 # --- MAIN SCREEN AREA ---
 
 # Empty State: Inspiration Gallery
-if not generate_btn:
+if not generate_btn and not st.session_state.itinerary_data:
     st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
     
@@ -197,226 +227,231 @@ if not generate_btn:
         st.markdown("#### 🏔️ Banff, Canada")
         st.caption("Crystal lakes, towering peaks, and ultimate wilderness.")
 
-# Active State: Itinerary Generation
-if generate_btn:
-    if not destination.strip():
-        st.warning("⚠️ Please enter a destination to generate your itinerary.")
-        st.stop()
-        
-    if not SYSTEM_GOOGLE_KEY:
-        st.error("🚨 API Key missing! Please check Streamlit Secrets or lines 75/76.")
-        st.stop()
+# Active State: Generating or Displaying Results
+if generate_btn or st.session_state.itinerary_data:
+    
+    # Grab active params (either currently generating, or saved in memory)
+    disp_dest = destination if generate_btn else st.session_state.dest_name
+    disp_days = num_days if generate_btn else st.session_state.trip_params["days"]
+    disp_month = travel_month if generate_btn else st.session_state.trip_params["month"]
+    disp_budget = budget if generate_btn else st.session_state.trip_params["budget"]
+    disp_persona = traveler_persona if generate_btn else st.session_state.trip_params["persona"]
 
-    st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{destination.upper()}</h1>', unsafe_allow_html=True)
+    st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{disp_dest.upper()}</h1>', unsafe_allow_html=True)
     
     # Hero Banner
-    safe_dest = urllib.parse.quote(destination)
+    safe_dest = urllib.parse.quote(disp_dest)
     st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
     
     # Trip Summary Metric Cards
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("📍 Destination", destination)
-    m2.metric("🗓️ Duration", f"{num_days} Days ({travel_month})")
-    m3.metric("💰 Budget", budget)
-    m4.metric("👥 Persona", traveler_persona)
+    m1.metric("📍 Destination", disp_dest)
+    m2.metric("🗓️ Duration", f"{disp_days} Days ({disp_month})")
+    m3.metric("💰 Budget", disp_budget)
+    m4.metric("👥 Persona", disp_persona)
     
     st.markdown("---")
-    
-    status_container = st.empty()
-    with status_container.status("🤖 **Gemini 3 Flash is researching in parallel...**", expanded=True) as status:
-        
-        fallback_models = [
-            "gemini-3-flash-preview",        # Your chosen primary model
-            "gemini-3.1-flash-lite-preview", # ⚡ NEW: 3.1 Flash Lite speed backup
-            "gemini-2.5-flash",              # Highly reliable backup
-            "gemma-3-27b-it"                 # Offline failsafe
-        ]
-        
-        success = False
-        raw_content = ""
-        last_error = ""
-        
-        for model_id in fallback_models:
-            try:
-                st.write(f"⚙️ Initializing High-Speed Engine: `{model_id}`...")
-                
-                agent_tools = []
-                if "gemma" not in model_id and SYSTEM_SERPAPI_KEY:
-                    agent_tools = [SerpApiTools(api_key=SYSTEM_SERPAPI_KEY)]
-                
-                # --- DEFINE PARALLEL FUNCTIONS ---
-                def get_itinerary():
-                    agent = Agent(
-                        name="Itinerary Planner",
-                        model=Gemini(id=model_id),
-                        tools=agent_tools,
-                        instructions=[
-                            f"You are the Itinerary Planner for a {num_days}-day trip to {destination} in {travel_month}.",
-                            f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
-                            "Generate ONLY the day-by-day schedule. Group locations geographically.",
-                            "Break each day into Morning, Afternoon, and Evening.",
-                            "For EVERY single location or restaurant, you MUST use this exact layout:",
-                            "### 📍 [Name of Location]",
-                            "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
-                            "<br><br>",
-                            "<img src=\"[REAL_IMG: Location Name, City]\">",
-                            "<br><br>",
-                            "*Write a short, engaging description.*",
-                            "> 🚊 **Transit to next location:** [e.g., 15 mins by subway/bus] | **Route:** From [Nearest Station/Stop of CURRENT location] to [Nearest Station/Stop of NEXT location]",
-                            "CRITICAL IMAGE RULE: You MUST use the exact syntax <img src=\"[REAL_IMG: Location Name, City]\"> for images."
-                        ]
-                    )
-                    return agent.run(f"Create the day-by-day itinerary for {destination}.", stream=False).content
 
-                def get_logistics():
-                    agent = Agent(
-                        name="Logistics Expert",
-                        model=Gemini(id=model_id),
-                        tools=agent_tools,
-                        instructions=[
-                            f"You are the Logistics Expert for a trip to {destination} in {travel_month}.",
-                            "Generate ONLY practical logistics and local rules.",
-                            "Use these exact bullet points:",
-                            "- **Flight & Airports:** Major entry points.",
-                            "- **Weather:** What to pack for this month.",
-                            "- **Transport:** Best way to get around.",
-                            "- **Etiquette:** 3 local rules to respect."
-                        ]
-                    )
-                    return agent.run(f"Gather logistics for {destination}.", stream=False).content
-
-                def get_hotels(itin_text):
-                    agent = Agent(
-                        name="Hotel Concierge",
-                        model=Gemini(id=model_id),
-                        tools=agent_tools,
-                        instructions=[
-                            f"You are the Hotel Concierge for a trip to {destination}.",
-                            f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
-                            "Generate ONLY 3 highly-rated hotel recommendations based on the provided itinerary.",
-                            "For EVERY hotel, you MUST use this exact layout:",
-                            "### 🏨 [Hotel Name]",
-                            "**[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
-                            "<br><br>",
-                            "<img src=\"[REAL_IMG: Hotel Name, City]\">",
-                            "<br><br>",
-                            "*Write a short explanation of why this fits the user.*",
-                            "CRITICAL IMAGE RULE: You MUST use the exact syntax <img src=\"[REAL_IMG: Hotel Name, City]\"> for images."
-                        ]
-                    )
-                    return agent.run(f"Find 3 highly-rated hotels in {destination} that are geographically convenient based on this itinerary:\n\n{itin_text}", stream=False).content
-
-                def get_editor(itin_text):
-                    agent = Agent(
-                        name="Chief Editor",
-                        model=Gemini(id=model_id),
-                        instructions=[
-                            f"You are the Chief Editor finalizing a travel plan for a {traveler_persona} traveling to {destination}.",
-                            f"Their budget is {budget} and their preferences are: '{user_preferences}'.",
-                            "Write a short, engaging, 1-paragraph 'Executive Welcome' that personally addresses the traveler and summarizes why this itinerary is perfect for them."
-                        ]
-                    )
-                    return agent.run(f"Write the Executive Welcome based on this itinerary: {itin_text}", stream=False).content
-
-                # --- EXECUTE IN PARALLEL THREADS ---
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    st.write("🚀 **Phase 1:** Planning Itinerary & Logistics simultaneously...")
-                    future_itin = executor.submit(get_itinerary)
-                    future_logistics = executor.submit(get_logistics)
-                    
-                    itinerary_content = future_itin.result()
-                    logistics_content = future_logistics.result()
-                    
-                    st.write("🚀 **Phase 2:** Scouting Hotels & Writing Welcome simultaneously...")
-                    future_hotel = executor.submit(get_hotels, itinerary_content)
-                    future_editor = executor.submit(get_editor, itinerary_content)
-                    
-                    hotel_content = future_hotel.result()
-                    summary_content = future_editor.result()
-                    
-                    st.write("📸 **Phase 3:** Fetching Real Verified Photography...")
-                    future_itin_img = executor.submit(process_images, itinerary_content)
-                    future_hotel_img = executor.submit(process_images, hotel_content)
-                    
-                    itinerary_content = future_itin_img.result()
-                    hotel_content = future_hotel_img.result()
-
-                # --- PYTHON TAB COMPILER ---
-                raw_content = f"### 📝 Editor's Welcome\n{summary_content}\n\n{itinerary_content}\n\n" \
-                              f"---TAB_SEPARATOR---\n\n" \
-                              f"## 🏨 Part 2: Top Accommodation Picks\n{hotel_content}\n\n" \
-                              f"---TAB_SEPARATOR---\n\n" \
-                              f"## 🛂 Part 3: Logistics & Practicalities\n{logistics_content}"
-                
-                success = True
-                break # Break out of the fallback loop if successful!
-                
-            except Exception as e:
-                last_error = str(e)
-                st.write(f"⚠️ `{model_id}` error. Switching to next engine...")
-                time.sleep(1)
-                continue
-                
-        if success:
-            status_container.empty() # This makes the entire loading box instantly vanish!
+    # --- PHASE: GENERATION LOOP ---
+    if generate_btn:
+        with st.status("🤖 **Gemini 3 Flash is researching in parallel...**", expanded=True) as status:
             
-            # Celebratory Animations
+            fallback_models = [
+                "gemini-3-flash-preview",        
+                "gemini-3.1-flash-lite-preview", 
+                "gemini-2.5-flash",              
+                "gemma-3-27b-it"                 
+            ]
+            
+            success = False
+            raw_content = ""
+            last_error = ""
+            
+            for model_id in fallback_models:
+                try:
+                    st.write(f"⚙️ Initializing High-Speed Engine: `{model_id}`...")
+                    
+                    agent_tools = []
+                    if "gemma" not in model_id and SYSTEM_SERPAPI_KEY:
+                        agent_tools = [SerpApiTools(api_key=SYSTEM_SERPAPI_KEY)]
+                    
+                    # --- DEFINE PARALLEL FUNCTIONS ---
+                    def get_itinerary():
+                        agent = Agent(
+                            name="Itinerary Planner",
+                            model=Gemini(id=model_id),
+                            tools=agent_tools,
+                            instructions=[
+                                f"You are the Itinerary Planner for a {num_days}-day trip to {destination} in {travel_month}.",
+                                f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
+                                "Generate ONLY the day-by-day schedule. Group locations geographically.",
+                                "Break each day into Morning, Afternoon, and Evening.",
+                                "For EVERY single location or restaurant, you MUST use this exact layout:",
+                                "### 📍 [Name of Location]",
+                                "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
+                                "<br><br>",
+                                "<img src=\"[REAL_IMG: Location Name, City]\">",
+                                "<br><br>",
+                                "*Write a short, engaging description.*",
+                                "> 🚊 **Transit to next location:** [e.g., 15 mins by subway/bus] | **Route:** From [Nearest Station/Stop of CURRENT location] to [Nearest Station/Stop of NEXT location]",
+                                "CRITICAL IMAGE RULE: You MUST use the exact syntax <img src=\"[REAL_IMG: Location Name, City]\"> for images."
+                            ]
+                        )
+                        return agent.run(f"Create the day-by-day itinerary for {destination}.", stream=False).content
+
+                    def get_logistics():
+                        agent = Agent(
+                            name="Logistics Expert",
+                            model=Gemini(id=model_id),
+                            tools=agent_tools,
+                            instructions=[
+                                f"You are the Logistics Expert for a trip to {destination} in {travel_month}.",
+                                "Generate ONLY practical logistics and local rules.",
+                                "Use these exact bullet points:",
+                                "- **Flight & Airports:** Major entry points.",
+                                "- **Weather:** What to pack for this month.",
+                                "- **Transport:** Best way to get around.",
+                                "- **Etiquette:** 3 local rules to respect."
+                            ]
+                        )
+                        return agent.run(f"Gather logistics for {destination}.", stream=False).content
+
+                    def get_hotels(itin_text):
+                        agent = Agent(
+                            name="Hotel Concierge",
+                            model=Gemini(id=model_id),
+                            tools=agent_tools,
+                            instructions=[
+                                f"You are the Hotel Concierge for a trip to {destination}.",
+                                f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
+                                "Generate ONLY 3 highly-rated hotel recommendations based on the provided itinerary.",
+                                "For EVERY hotel, you MUST use this exact layout:",
+                                "### 🏨 [Hotel Name]",
+                                "**[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
+                                "<br><br>",
+                                "<img src=\"[REAL_IMG: Hotel Name, City]\">",
+                                "<br><br>",
+                                "*Write a short explanation of why this fits the user.*",
+                                "CRITICAL IMAGE RULE: You MUST use the exact syntax <img src=\"[REAL_IMG: Hotel Name, City]\"> for images."
+                            ]
+                        )
+                        return agent.run(f"Find 3 highly-rated hotels in {destination} that are geographically convenient based on this itinerary:\n\n{itin_text}", stream=False).content
+
+                    def get_editor(itin_text):
+                        agent = Agent(
+                            name="Chief Editor",
+                            model=Gemini(id=model_id),
+                            instructions=[
+                                f"You are the Chief Editor finalizing a travel plan for a {traveler_persona} traveling to {destination}.",
+                                f"Their budget is {budget} and their preferences are: '{user_preferences}'.",
+                                "Write a short, engaging, 1-paragraph 'Executive Welcome' that personally addresses the traveler and summarizes why this itinerary is perfect for them."
+                            ]
+                        )
+                        return agent.run(f"Write the Executive Welcome based on this itinerary: {itin_text}", stream=False).content
+
+                    # --- EXECUTE IN PARALLEL THREADS ---
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        st.write("🚀 **Phase 1:** Planning Itinerary & Logistics simultaneously...")
+                        future_itin = executor.submit(get_itinerary)
+                        future_logistics = executor.submit(get_logistics)
+                        
+                        itinerary_content = future_itin.result()
+                        logistics_content = future_logistics.result()
+                        
+                        st.write("🚀 **Phase 2:** Scouting Hotels & Writing Welcome simultaneously...")
+                        future_hotel = executor.submit(get_hotels, itinerary_content)
+                        future_editor = executor.submit(get_editor, itinerary_content)
+                        
+                        hotel_content = future_hotel.result()
+                        summary_content = future_editor.result()
+                        
+                        st.write("📸 **Phase 3:** Fetching Real Verified Photography...")
+                        future_itin_img = executor.submit(process_images, itinerary_content)
+                        future_hotel_img = executor.submit(process_images, hotel_content)
+                        
+                        itinerary_content = future_itin_img.result()
+                        hotel_content = future_hotel_img.result()
+
+                    # --- PYTHON TAB COMPILER ---
+                    raw_content = f"### 📝 Editor's Welcome\n{summary_content}\n\n{itinerary_content}\n\n" \
+                                  f"---TAB_SEPARATOR---\n\n" \
+                                  f"## 🏨 Part 2: Top Accommodation Picks\n{hotel_content}\n\n" \
+                                  f"---TAB_SEPARATOR---\n\n" \
+                                  f"## 🛂 Part 3: Logistics & Practicalities\n{logistics_content}"
+                    
+                    success = True
+                    break # Break out of the fallback loop if successful!
+                    
+                except Exception as e:
+                    last_error = str(e)
+                    st.write(f"⚠️ `{model_id}` error. Switching to next engine...")
+                    time.sleep(1)
+                    continue
+                    
+            if success:
+                st.session_state.itinerary_data = raw_content
+                st.rerun() # This instantly refreshes the page, skipping the loading box completely!
+            else:
+                status.update(label="❌ **Generation Failed**", state="error", expanded=True)
+                st.error("🚨 All available AI engines have hit their daily limit.")
+                st.info("💡 **Solution:** Please try again tomorrow after your quota resets.")
+                st.code(f"Technical Error Data: {last_error}")
+
+    # --- PHASE: DISPLAY RESULTS ---
+    elif st.session_state.itinerary_data:
+        
+        # Celebratory Animations (Only run once per generation)
+        if not st.session_state.celebrated:
             st.balloons()
             st.toast('Your custom itinerary has been successfully generated!', icon='🎉')
-            
-            # Tabbed Navigation (Automatically defaults to Tab 1: Itinerary)
-            parts = raw_content.split("---TAB_SEPARATOR---")
-            
-            if len(parts) >= 3:
-                tab1, tab2, tab3 = st.tabs(["🗺️ Day-by-Day Itinerary", "🏨 Accommodations", "🛂 Logistics & Practicalities"])
-                with tab1:
-                    st.markdown(parts[0], unsafe_allow_html=True)
-                with tab2:
-                    st.markdown(parts[1], unsafe_allow_html=True)
-                with tab3:
-                    st.markdown(parts[2], unsafe_allow_html=True)
-            else:
-                st.warning("Could not automatically separate the tabs. Displaying full dossier below:")
-                st.markdown(raw_content, unsafe_allow_html=True)
-            
-            # --- DOWNLOAD & PDF EXPORT BUTTONS ---
-            st.markdown("---")
-            colA, colB = st.columns(2)
-            
-            with colA:
-                st.download_button(
-                    label="📄 Download Raw Markdown (.md)",
-                    data=raw_content.replace("---TAB_SEPARATOR---", "\n\n---\n\n"),
-                    file_name=f"Custom_Itinerary_{destination.replace(' ', '_')}.md",
-                    mime="text/markdown",
-                    use_container_width=True
-                )
-                
-            with colB:
-                components.html(
-                    """
-                    <script>
-                    function printPage() {
-                        window.parent.print();
-                    }
-                    </script>
-                    <button onclick="printPage()" style="width: 100%; padding: 0.5rem 1rem; background-color: #ffffff; border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; color: #31333F; font-family: 'Source Sans Pro', sans-serif; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                        🖨️ Save as PDF
-                    </button>
-                    <style>
-                        button:hover {
-                            border-color: #ff4b4b !important;
-                            color: #ff4b4b !important;
-                            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                        }
-                    </style>
-                    """,
-                    height=50
-                )
-                
+            st.session_state.celebrated = True
+        
+        # Tabbed Navigation (Automatically defaults to Tab 1: Itinerary)
+        parts = st.session_state.itinerary_data.split("---TAB_SEPARATOR---")
+        
+        if len(parts) >= 3:
+            tab1, tab2, tab3 = st.tabs(["🗺️ Day-by-Day Itinerary", "🏨 Accommodations", "🛂 Logistics & Practicalities"])
+            with tab1:
+                st.markdown(parts[0], unsafe_allow_html=True)
+            with tab2:
+                st.markdown(parts[1], unsafe_allow_html=True)
+            with tab3:
+                st.markdown(parts[2], unsafe_allow_html=True)
         else:
-            # If all models failed, show the error state
-            status.update(label="❌ **Generation Failed**", state="error", expanded=True)
-            st.error("🚨 All available AI engines have hit their daily limit.")
-            st.info("💡 **Solution:** Please try again tomorrow after your quota resets.")
-            st.code(f"Technical Error Data: {last_error}")
+            st.warning("Could not automatically separate the tabs. Displaying full dossier below:")
+            st.markdown(st.session_state.itinerary_data, unsafe_allow_html=True)
+        
+        # --- DOWNLOAD & PDF EXPORT BUTTONS ---
+        st.markdown("---")
+        colA, colB = st.columns(2)
+        
+        with colA:
+            st.download_button(
+                label="📄 Download Raw Markdown (.md)",
+                data=st.session_state.itinerary_data.replace("---TAB_SEPARATOR---", "\n\n---\n\n"),
+                file_name=f"Custom_Itinerary_{disp_dest.replace(' ', '_')}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
+            
+        with colB:
+            components.html(
+                """
+                <script>
+                function printPage() {
+                    window.parent.print();
+                }
+                </script>
+                <button onclick="printPage()" style="width: 100%; padding: 0.5rem 1rem; background-color: #ffffff; border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 0.5rem; color: #31333F; font-family: 'Source Sans Pro', sans-serif; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    🖨️ Save as PDF
+                </button>
+                <style>
+                    button:hover {
+                        border-color: #ff4b4b !important;
+                        color: #ff4b4b !important;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    }
+                </style>
+                """,
+                height=50
+            )
