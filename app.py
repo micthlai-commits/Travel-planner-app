@@ -299,7 +299,7 @@ if not generate_btn and not st.session_state.itinerary_data:
         if i < len(trending_places):
             place = trending_places[i]
             with col:
-                st.image(place.get("image_url", "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf)"), use_container_width=True)
+                st.image(place.get("image_url", "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"), use_container_width=True)
                 st.markdown(f"#### 📍 {place.get('destination', 'Unknown')}")
                 st.caption(place.get('description', ''))
 
