@@ -201,9 +201,43 @@ def process_images(text):
         
     return text
 
+# --- THE DAILY AI TREND SCOUT ---
+@st.cache_data(ttl=86400, show_spinner=False) # Caches the output for exactly 24 hours
+def get_trending_destinations():
+    """Fetches trending destinations for HK travelers autonomously and gets real photos."""
+    try:
+        agent = Agent(
+            name="Trend Scout",
+            model=Gemini(id="gemini-2.5-flash"), 
+            instructions=[
+                "You are an expert travel trend analyst for the Hong Kong market.",
+                "Identify the top 3 trending international travel destinations for Hong Kong tourists right now. Consider seasonal trends, favorable exchange rates (like the Japanese Yen), and current popularity.",
+                "Return ONLY a valid JSON array. Do NOT wrap it in markdown backticks (```json).",
+                'Format exactly like this: [{"destination": "City, Country", "description": "Short catchy description (max 10 words)"}]'
+            ]
+        )
+        response = agent.run("Get top 3 trending destinations for HK tourists.", stream=False).content
+        
+        # Strip potential markdown formatting just in case
+        cleaned_response = response.replace("```json", "").replace("```", "").strip()
+        destinations = json.loads(cleaned_response)
+        
+        # Fetch real photos using the waterfall engine
+        for dest in destinations[:3]:
+            dest['image_url'] = fetch_real_image(dest['destination'])
+            
+        return destinations[:3]
+    except Exception as e:
+        # Failsafe: Static trends if AI or internet fails
+        return [
+            {"destination": "Tokyo, Japan", "description": "Neon lights, ancient temples, and culinary perfection.", "image_url": "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"},
+            {"destination": "Paris, France", "description": "Art, romance, and café culture by the Seine.", "image_url": "[https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80)"},
+            {"destination": "Banff, Canada", "description": "Crystal lakes, towering peaks, and ultimate wilderness.", "image_url": "[https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80)"}
+        ]
+
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
+    st.image("[https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png)", width=50)
     st.markdown("### ⚙️ Trip Configuration")
     
     destination = st.text_input("🛬 Destination:", "")
@@ -249,29 +283,25 @@ if generate_btn:
 
 # --- MAIN SCREEN AREA ---
 
-# Empty State: Static Inspiration Gallery
+# Empty State: Dynamic Inspiration Gallery
 if not generate_btn and not st.session_state.itinerary_data:
     st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
     st.info("👈 Use the Dashboard on the left to configure your parameters and generate a custom AI dossier!")
     
-    st.markdown("### ✨ Inspiration Gallery")
-    gal1, gal2, gal3 = st.columns(3)
+    st.markdown("### 📈 Trending Now for Hong Kong Travelers")
     
-    with gal1:
-        st.image("https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
-        st.markdown("#### 🗼 Tokyo, Japan")
-        st.caption("Neon lights, ancient temples, and culinary perfection.")
-
-    with gal2:
-        st.image("https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
-        st.markdown("#### 🥐 Paris, France")
-        st.caption("Art, romance, and café culture by the Seine.")
-
-    with gal3:
-        st.image("https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80", use_container_width=True)
-        st.markdown("#### 🏔️ Banff, Canada")
-        st.caption("Crystal lakes, towering peaks, and ultimate wilderness.")
+    with st.spinner("🤖 AI Scout is fetching today's top travel trends..."):
+        trending_places = get_trending_destinations()
+        
+    cols = st.columns(3)
+    for i, col in enumerate(cols):
+        if i < len(trending_places):
+            place = trending_places[i]
+            with col:
+                st.image(place.get("image_url", "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf)"), use_container_width=True)
+                st.markdown(f"#### 📍 {place.get('destination', 'Unknown')}")
+                st.caption(place.get('description', ''))
 
 # Active State: Generating or Displaying Results
 if generate_btn or st.session_state.itinerary_data:
@@ -285,7 +315,7 @@ if generate_btn or st.session_state.itinerary_data:
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{disp_dest.upper()}</h1>', unsafe_allow_html=True)
     
     safe_dest = urllib.parse.quote(disp_dest)
-    st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
+    st.image(f"[https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of](https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of)+{safe_dest}?width=1200&height=350", use_container_width=True)
     
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("📍 Destination", disp_dest)
