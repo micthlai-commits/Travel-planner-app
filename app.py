@@ -94,51 +94,83 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 👇 PASTE YOUR NEW TIER 1 KEY INSIDE THE QUOTATION MARKS BELOW 👇
+# 👇 LOCAL TESTING KEYS (Keep empty if using Streamlit Secrets) 👇
 LOCAL_SERPAPI_KEY = "" 
 LOCAL_GOOGLE_KEY = "" 
-# 👆 ------------------------------------------------ 👆
+LOCAL_UNSPLASH_KEY = ""
+# 👆 -------------------------------------------------------- 👆
 
 try:
     SYSTEM_SERPAPI_KEY = st.secrets["SERPAPI_KEY"] 
     SYSTEM_GOOGLE_KEY = st.secrets["GOOGLE_API_KEY"] 
+    SYSTEM_UNSPLASH_KEY = st.secrets.get("UNSPLASH_API_KEY", "")
 except Exception:
     SYSTEM_SERPAPI_KEY = LOCAL_SERPAPI_KEY
     SYSTEM_GOOGLE_KEY = LOCAL_GOOGLE_KEY
+    SYSTEM_UNSPLASH_KEY = LOCAL_UNSPLASH_KEY
 
-# Set the active API key for the environment
 os.environ["GOOGLE_API_KEY"] = SYSTEM_GOOGLE_KEY
 
-# --- REAL PHOTO FETCHING ENGINE ---
+# --- THE ULTIMATE WATERFALL IMAGE ENGINE ---
 def fetch_real_image(query):
-    """Fetches real photos from Wikipedia API (Free) or falls back to Pollinations."""
+    """4-Tier Image Fetcher: Unsplash -> SerpApi (Google Images) -> Smart Wikipedia -> AI Failsafe"""
+    encoded_query = urllib.parse.quote(query)
+    
+    # TIER 1: Unsplash (Cinematic & Free)
+    if SYSTEM_UNSPLASH_KEY:
+        try:
+            url = f"https://api.unsplash.com/search/photos?query={encoded_query}&client_id={SYSTEM_UNSPLASH_KEY}&per_page=1&orientation=landscape"
+            req = urllib.request.Request(url, headers={'User-Agent': 'TravelPlanner/1.0'})
+            with urllib.request.urlopen(req, timeout=3) as response:
+                data = json.loads(response.read().decode())
+                if data['results']:
+                    return data['results'][0]['urls']['regular']
+        except Exception:
+            pass
+
+    # TIER 2: SerpApi Google Images (Pinpoint Accuracy for Restaurants/Specifics)
+    if SYSTEM_SERPAPI_KEY:
+        try:
+            url = f"https://serpapi.com/search.json?engine=google_images&q={encoded_query}&api_key={SYSTEM_SERPAPI_KEY}"
+            req = urllib.request.Request(url, headers={'User-Agent': 'TravelPlanner/1.0'})
+            with urllib.request.urlopen(req, timeout=3) as response:
+                data = json.loads(response.read().decode())
+                if 'images_results' in data and len(data['images_results']) > 0:
+                    return data['images_results'][0]['original']
+        except Exception:
+            pass
+
+    # TIER 3: Smart Wikipedia Filter (Rejects maps and logos)
     try:
-        # Step 1: Search Wikipedia for the location
-        search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&utf8=&format=json"
-        req = urllib.request.Request(search_url, headers={'User-Agent': 'TravelPlannerApp/1.0'})
+        clean_query = query.split(',')[0].strip() # Removes city name to prevent wiki confusion
+        search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(clean_query)}&utf8=&format=json"
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'TravelPlanner/1.0'})
         with urllib.request.urlopen(req, timeout=3) as response:
             search_data = json.loads(response.read().decode())
-            if not search_data['query']['search']:
-                raise ValueError("No Wikipedia page found")
-            title = search_data['query']['search'][0]['title']
-            
-        # Step 2: Grab the main verified photo of that page
-        image_url = f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}&prop=pageimages&format=json&pithumbsize=1000"
-        req = urllib.request.Request(image_url, headers={'User-Agent': 'TravelPlannerApp/1.0'})
-        with urllib.request.urlopen(req, timeout=3) as response:
-            image_data = json.loads(response.read().decode())
-            pages = image_data['query']['pages']
-            page_id = list(pages.keys())[0]
-            if 'thumbnail' in pages[page_id]:
-                return pages[page_id]['thumbnail']['source']
+            if search_data['query']['search']:
+                title = search_data['query']['search'][0]['title']
+                image_url = f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}&prop=pageimages&format=json&pithumbsize=1000"
+                
+                req2 = urllib.request.Request(image_url, headers={'User-Agent': 'TravelPlanner/1.0'})
+                with urllib.request.urlopen(req2, timeout=3) as response2:
+                    image_data = json.loads(response2.read().decode())
+                    pages = image_data['query']['pages']
+                    page_id = list(pages.keys())[0]
+                    if 'thumbnail' in pages[page_id]:
+                        img_src = pages[page_id]['thumbnail']['source']
+                        # SMART FILTER: Reject if it is a map, flag, logo, or icon
+                        lower_src = img_src.lower()
+                        if not any(bad_word in lower_src for bad_word in ['map', 'flag', 'logo', '.svg', 'icon']):
+                            return img_src
     except Exception:
         pass
     
-    # Fallback to realistic AI image if Wikipedia lacks a photo
-    return f"https://image.pollinations.ai/prompt/Realistic+Cinematic+Photography+of+{urllib.parse.quote(query)}?width=1000&height=500"
+    # TIER 4: Pollinations AI (Failsafe Placeholder)
+    return f"https://image.pollinations.ai/prompt/Realistic+Cinematic+Photography+of+{encoded_query}?width=1000&height=500"
+
 
 def process_images(text):
-    """Finds all [REAL_IMG] placeholders from the AI and concurrently injects real photos."""
+    """Finds all [REAL_IMG] placeholders and concurrently runs the Waterfall Engine."""
     pattern = r"\[REAL_IMG:\s*(.*?)\]"
     matches = list(set(re.findall(pattern, text)))
     
@@ -148,7 +180,6 @@ def process_images(text):
     def get_img_url(query):
         return query, fetch_real_image(query)
 
-    # Fetch all images simultaneously to keep the app lightning fast
     with concurrent.futures.ThreadPoolExecutor() as executor:
         results = executor.map(get_img_url, matches)
         
@@ -191,7 +222,6 @@ if generate_btn:
         st.sidebar.error("🚨 API Key missing!")
         st.stop()
         
-    # Clear old data and prepare for new generation
     st.session_state.itinerary_data = None
     st.session_state.celebrated = False
     st.session_state.dest_name = destination
@@ -204,11 +234,9 @@ if generate_btn:
 
 # --- MAIN SCREEN AREA ---
 
-# Empty State: Inspiration Gallery
 if not generate_btn and not st.session_state.itinerary_data:
     st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
-    
     st.info("👈 Use the Dashboard on the left to configure your parameters and generate a custom AI dossier!")
     
     st.markdown("### ✨ Inspiration Gallery")
@@ -227,10 +255,9 @@ if not generate_btn and not st.session_state.itinerary_data:
         st.markdown("#### 🏔️ Banff, Canada")
         st.caption("Crystal lakes, towering peaks, and ultimate wilderness.")
 
-# Active State: Generating or Displaying Results
+
 if generate_btn or st.session_state.itinerary_data:
     
-    # Grab active params (either currently generating, or saved in memory)
     disp_dest = destination if generate_btn else st.session_state.dest_name
     disp_days = num_days if generate_btn else st.session_state.trip_params["days"]
     disp_month = travel_month if generate_btn else st.session_state.trip_params["month"]
@@ -239,43 +266,33 @@ if generate_btn or st.session_state.itinerary_data:
 
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{disp_dest.upper()}</h1>', unsafe_allow_html=True)
     
-    # Hero Banner
     safe_dest = urllib.parse.quote(disp_dest)
     st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
     
-    # Trip Summary Metric Cards
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("📍 Destination", disp_dest)
     m2.metric("🗓️ Duration", f"{disp_days} Days ({disp_month})")
     m3.metric("💰 Budget", disp_budget)
     m4.metric("👥 Persona", disp_persona)
-    
     st.markdown("---")
 
-    # --- PHASE: GENERATION LOOP ---
     if generate_btn:
-        with st.status("🤖 **Gemini 3 Flash is researching in parallel...**", expanded=True) as status:
+        status_container = st.empty()
+        with status_container.status("🤖 **AI Agents researching in parallel...**", expanded=True) as status:
             
-            fallback_models = [
-                "gemini-3-flash-preview",        
-                "gemini-3.1-flash-lite-preview", 
-                "gemini-2.5-flash",              
-                "gemma-3-27b-it"                 
-            ]
-            
+            fallback_models = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview", "gemini-2.5-flash"]
             success = False
             raw_content = ""
             last_error = ""
             
             for model_id in fallback_models:
                 try:
-                    st.write(f"⚙️ Initializing High-Speed Engine: `{model_id}`...")
+                    st.write(f"⚙️ Initializing Engine: `{model_id}`...")
                     
                     agent_tools = []
-                    if "gemma" not in model_id and SYSTEM_SERPAPI_KEY:
+                    if SYSTEM_SERPAPI_KEY:
                         agent_tools = [SerpApiTools(api_key=SYSTEM_SERPAPI_KEY)]
                     
-                    # --- DEFINE PARALLEL FUNCTIONS ---
                     def get_itinerary():
                         agent = Agent(
                             name="Itinerary Planner",
@@ -284,8 +301,7 @@ if generate_btn or st.session_state.itinerary_data:
                             instructions=[
                                 f"You are the Itinerary Planner for a {num_days}-day trip to {destination} in {travel_month}.",
                                 f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
-                                "Generate ONLY the day-by-day schedule. Group locations geographically.",
-                                "Break each day into Morning, Afternoon, and Evening.",
+                                "Generate ONLY the day-by-day schedule.",
                                 "For EVERY single location or restaurant, you MUST use this exact layout:",
                                 "### 📍 [Name of Location]",
                                 "**⏱️ Suggested Time:** [e.g., 2 hours] | **[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Location+Name)**",
@@ -305,9 +321,8 @@ if generate_btn or st.session_state.itinerary_data:
                             model=Gemini(id=model_id),
                             tools=agent_tools,
                             instructions=[
-                                f"You are the Logistics Expert for a trip to {destination} in {travel_month}.",
+                                f"You are the Logistics Expert for a trip to {destination}.",
                                 "Generate ONLY practical logistics and local rules.",
-                                "Use these exact bullet points:",
                                 "- **Flight & Airports:** Major entry points.",
                                 "- **Weather:** What to pack for this month.",
                                 "- **Transport:** Best way to get around.",
@@ -322,57 +337,50 @@ if generate_btn or st.session_state.itinerary_data:
                             model=Gemini(id=model_id),
                             tools=agent_tools,
                             instructions=[
-                                f"You are the Hotel Concierge for a trip to {destination}.",
-                                f"Traveler: '{traveler_persona}'. Budget: '{budget}'. Preferences: '{user_preferences}'.",
-                                "Generate ONLY 3 highly-rated hotel recommendations based on the provided itinerary.",
-                                "For EVERY hotel, you MUST use this exact layout:",
+                                f"Find 3 highly-rated hotels in {destination} that fit the {traveler_persona} persona.",
+                                "For EVERY hotel, use this exact layout:",
                                 "### 🏨 [Hotel Name]",
                                 "**[🗺️ View on Google Maps](https://www.google.com/maps/search/?api=1&query=Hotel+Name)**",
                                 "<br><br>",
                                 "<img src=\"[REAL_IMG: Hotel Name, City]\">",
                                 "<br><br>",
-                                "*Write a short explanation of why this fits the user.*",
-                                "CRITICAL IMAGE RULE: You MUST use the exact syntax <img src=\"[REAL_IMG: Hotel Name, City]\"> for images."
+                                "*Write a short explanation.*"
                             ]
                         )
-                        return agent.run(f"Find 3 highly-rated hotels in {destination} that are geographically convenient based on this itinerary:\n\n{itin_text}", stream=False).content
+                        return agent.run(f"Find 3 highly-rated hotels in {destination}.", stream=False).content
 
                     def get_editor(itin_text):
                         agent = Agent(
                             name="Chief Editor",
                             model=Gemini(id=model_id),
                             instructions=[
-                                f"You are the Chief Editor finalizing a travel plan for a {traveler_persona} traveling to {destination}.",
-                                f"Their budget is {budget} and their preferences are: '{user_preferences}'.",
-                                "Write a short, engaging, 1-paragraph 'Executive Welcome' that personally addresses the traveler and summarizes why this itinerary is perfect for them."
+                                f"Write a short, engaging, 1-paragraph 'Executive Welcome' for a {traveler_persona} traveling to {destination}."
                             ]
                         )
-                        return agent.run(f"Write the Executive Welcome based on this itinerary: {itin_text}", stream=False).content
+                        return agent.run(f"Write the Executive Welcome.", stream=False).content
 
-                    # --- EXECUTE IN PARALLEL THREADS ---
                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                        st.write("🚀 **Phase 1:** Planning Itinerary & Logistics simultaneously...")
+                        st.write("🚀 **Phase 1:** Planning Itinerary & Logistics...")
                         future_itin = executor.submit(get_itinerary)
                         future_logistics = executor.submit(get_logistics)
                         
                         itinerary_content = future_itin.result()
                         logistics_content = future_logistics.result()
                         
-                        st.write("🚀 **Phase 2:** Scouting Hotels & Writing Welcome simultaneously...")
+                        st.write("🚀 **Phase 2:** Scouting Hotels & Writing Welcome...")
                         future_hotel = executor.submit(get_hotels, itinerary_content)
                         future_editor = executor.submit(get_editor, itinerary_content)
                         
                         hotel_content = future_hotel.result()
                         summary_content = future_editor.result()
                         
-                        st.write("📸 **Phase 3:** Fetching Real Verified Photography...")
+                        st.write("📸 **Phase 3:** Executing Waterfall Image Engine (Unsplash + Google)...")
                         future_itin_img = executor.submit(process_images, itinerary_content)
                         future_hotel_img = executor.submit(process_images, hotel_content)
                         
                         itinerary_content = future_itin_img.result()
                         hotel_content = future_hotel_img.result()
 
-                    # --- PYTHON TAB COMPILER ---
                     raw_content = f"### 📝 Editor's Welcome\n{summary_content}\n\n{itinerary_content}\n\n" \
                                   f"---TAB_SEPARATOR---\n\n" \
                                   f"## 🏨 Part 2: Top Accommodation Picks\n{hotel_content}\n\n" \
@@ -380,7 +388,7 @@ if generate_btn or st.session_state.itinerary_data:
                                   f"## 🛂 Part 3: Logistics & Practicalities\n{logistics_content}"
                     
                     success = True
-                    break # Break out of the fallback loop if successful!
+                    break 
                     
                 except Exception as e:
                     last_error = str(e)
@@ -390,23 +398,19 @@ if generate_btn or st.session_state.itinerary_data:
                     
             if success:
                 st.session_state.itinerary_data = raw_content
-                st.rerun() # This instantly refreshes the page, skipping the loading box completely!
+                status_container.empty() # Clear loading status
+                st.rerun() 
             else:
                 status.update(label="❌ **Generation Failed**", state="error", expanded=True)
-                st.error("🚨 All available AI engines have hit their daily limit.")
-                st.info("💡 **Solution:** Please try again tomorrow after your quota resets.")
+                st.error("🚨 All AI engines have hit limits or failed.")
                 st.code(f"Technical Error Data: {last_error}")
 
-    # --- PHASE: DISPLAY RESULTS ---
     elif st.session_state.itinerary_data:
-        
-        # Celebratory Animations (Only run once per generation)
         if not st.session_state.celebrated:
             st.balloons()
             st.toast('Your custom itinerary has been successfully generated!', icon='🎉')
             st.session_state.celebrated = True
         
-        # Tabbed Navigation (Automatically defaults to Tab 1: Itinerary)
         parts = st.session_state.itinerary_data.split("---TAB_SEPARATOR---")
         
         if len(parts) >= 3:
@@ -418,10 +422,9 @@ if generate_btn or st.session_state.itinerary_data:
             with tab3:
                 st.markdown(parts[2], unsafe_allow_html=True)
         else:
-            st.warning("Could not automatically separate the tabs. Displaying full dossier below:")
+            st.warning("Displaying full dossier below:")
             st.markdown(st.session_state.itinerary_data, unsafe_allow_html=True)
         
-        # --- DOWNLOAD & PDF EXPORT BUTTONS ---
         st.markdown("---")
         colA, colB = st.columns(2)
         
