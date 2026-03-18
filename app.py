@@ -230,15 +230,15 @@ def get_trending_destinations():
     except Exception as e:
         # Failsafe: Static trends with reasoning if AI or internet fails
         return [
-            {"destination": "Tokyo, Japan", "description": "Neon lights, ancient temples, and culinary perfection.", "reasoning": "Consistently popular due to favorable JPY exchange rates and seasonal beauty.", "image_url": "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"},
-            {"destination": "Taipei, Taiwan", "description": "Night markets, vibrant culture, and relaxing hot springs.", "reasoning": "The perfect, accessible weekend getaway with affordable high-quality food.", "image_url": "[https://images.unsplash.com/photo-1571474004524-73898bd03c3d?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1571474004524-73898bd03c3d?auto=format&fit=crop&w=600&h=400&q=80)"},
-            {"destination": "Seoul, South Korea", "description": "K-pop, cosmetics, and incredible street food.", "reasoning": "Currently trending for its vibrant cafe culture and premium shopping.", "image_url": "[https://images.unsplash.com/photo-1580281657527-47f249e8f4df?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1580281657527-47f249e8f4df?auto=format&fit=crop&w=600&h=400&q=80)"}
+            {"destination": "Tokyo, Japan", "description": "Neon lights, ancient temples, and culinary perfection.", "reasoning": "Consistently popular due to favorable JPY exchange rates and seasonal beauty.", "image_url": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80"},
+            {"destination": "Taipei, Taiwan", "description": "Night markets, vibrant culture, and relaxing hot springs.", "reasoning": "The perfect, accessible weekend getaway with affordable high-quality food.", "image_url": "https://images.unsplash.com/photo-1571474004524-73898bd03c3d?auto=format&fit=crop&w=600&h=400&q=80"},
+            {"destination": "Seoul, South Korea", "description": "K-pop, cosmetics, and incredible street food.", "reasoning": "Currently trending for its vibrant cafe culture and premium shopping.", "image_url": "https://images.unsplash.com/photo-1580281657527-47f249e8f4df?auto=format&fit=crop&w=600&h=400&q=80"}
         ]
 
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
     # PERFECTLY CLEAN PURE STRING URL - NO MARKDOWN BRACKETS
-    st.image("[https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png)", width=50)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
     st.markdown("### ⚙️ Trip Configuration")
     
     destination = st.text_input("🛬 Destination:", "")
@@ -302,7 +302,7 @@ if not generate_btn and not st.session_state.itinerary_data:
         if i < len(trending_places):
             place = trending_places[i]
             with col:
-                st.image(place.get("image_url", "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"), use_container_width=True)
+                st.image(place.get("image_url", "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80"), use_container_width=True)
                 st.markdown(f"#### 📍 {place.get('destination', 'Unknown')}")
                 st.caption(f"*{place.get('description', '')}*")
                 # Transparently display the AI's reasoning
@@ -320,7 +320,7 @@ if generate_btn or st.session_state.itinerary_data:
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{disp_dest.upper()}</h1>', unsafe_allow_html=True)
     
     safe_dest = urllib.parse.quote(disp_dest)
-    st.image(f"[https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of](https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of)+{safe_dest}?width=1200&height=350", use_container_width=True)
+    st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
     
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("📍 Destination", disp_dest)
