@@ -24,7 +24,7 @@ if 'trip_params' not in st.session_state:
 if 'celebrated' not in st.session_state:
     st.session_state.celebrated = False
 
-# --- OPTION 1: ADAPTIVE GLASSMORPHISM CSS ---
+# --- ADAPTIVE GLASSMORPHISM CSS ---
 st.markdown("""
 <style>
     /* Premium Timeline & Visual Styles */
@@ -79,7 +79,7 @@ st.markdown("""
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
     }
 
-    /* MODERN ACCORDIONS (Option 3) */
+    /* MODERN ACCORDIONS */
     [data-testid="stExpander"] {
         background: rgba(128, 128, 128, 0.02);
         border-radius: 12px;
@@ -237,6 +237,7 @@ def get_trending_destinations():
 
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
+    # PERFECTLY CLEAN PURE STRING URL - NO MARKDOWN BRACKETS
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
     st.markdown("### ⚙️ Trip Configuration")
     
@@ -277,7 +278,7 @@ if generate_btn:
         st.error("🚨 API Key missing!")
         st.stop()
         
-    # Reset displays
+    # Reset displays before generating
     st.session_state.itinerary_data = None
     st.session_state.celebrated = False
 
@@ -289,8 +290,8 @@ if not generate_btn and not st.session_state.itinerary_data:
     st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
     st.info("👈 Use the Dashboard on the left to configure your parameters and generate a custom AI dossier!")
     
+    # 📈 TRENDING GALLERY
     st.markdown("### 📈 Trending Now for Hong Kong Travelers")
-    
     with st.spinner("🤖 AI Scout is fetching today's top travel trends..."):
         trending_places = get_trending_destinations()
         
@@ -352,7 +353,6 @@ if generate_btn or st.session_state.itinerary_data:
                                 f"You are the Itinerary Planner for a {disp_days}-day trip to {disp_dest} in {disp_month}.",
                                 f"Traveler: '{disp_persona}'. Budget: '{disp_budget}'. Preferences: '{user_preferences}'.",
                                 "Generate ONLY the day-by-day schedule.",
-                                # OPTION 3 REQUIREMENT: Strict Header formatting
                                 "CRITICAL: You MUST start every single day with this exact header format: `## Day [Number]: [Theme of the Day]` (e.g., `## Day 1: Arrival & City Exploration`).",
                                 "For EVERY single location or restaurant, you MUST use this exact layout:",
                                 "### 📍 [Name of Location]",
@@ -416,7 +416,6 @@ if generate_btn or st.session_state.itinerary_data:
                         future_itin = executor.submit(get_itinerary)
                         future_logistics = executor.submit(get_logistics)
                         
-                        # Entertaining Polling Loop 1
                         msgs1 = ["🗺️ Mapping out optimal routes...", "🕵️‍♂️ Asking locals for hidden gems...", "📝 Drafting day-by-day plans..."]
                         i = 0
                         while not (future_itin.done() and future_logistics.done()):
@@ -431,7 +430,6 @@ if generate_btn or st.session_state.itinerary_data:
                         future_hotel = executor.submit(get_hotels, itinerary_content)
                         future_editor = executor.submit(get_editor, itinerary_content)
                         
-                        # Entertaining Polling Loop 2
                         msgs2 = ["🏨 Checking room availabilities...", "🛎️ Contacting hotel concierges...", "✍️ Polishing the executive summary..."]
                         i = 0
                         while not (future_hotel.done() and future_editor.done()):
@@ -446,7 +444,6 @@ if generate_btn or st.session_state.itinerary_data:
                         future_itin_img = executor.submit(process_images, itinerary_content)
                         future_hotel_img = executor.submit(process_images, hotel_content)
                         
-                        # Entertaining Polling Loop 3
                         msgs3 = ["📸 Fetching cinematic photos...", "🖼️ Formatting the visual gallery...", "🎨 Applying finishing touches..."]
                         i = 0
                         while not (future_itin_img.done() and future_hotel_img.done()):
@@ -458,7 +455,6 @@ if generate_btn or st.session_state.itinerary_data:
                         hotel_content = future_hotel_img.result()
                         loading_msg.success("✨ Finalizing your dossier!")
 
-                    # Note the strict separation to ensure parsing works perfectly
                     raw_content = f"{summary_content}\n\n---TAB_SEPARATOR---\n\n{itinerary_content}\n\n---TAB_SEPARATOR---\n\n{hotel_content}\n\n---TAB_SEPARATOR---\n\n{logistics_content}"
                     
                     success = True
@@ -472,7 +468,7 @@ if generate_btn or st.session_state.itinerary_data:
                     
             if success:
                 st.session_state.itinerary_data = raw_content
-                status_container.empty() # Clear loading status for instant display
+                status_container.empty() 
                 st.rerun() 
             else:
                 status.update(label="❌ **Generation Failed**", state="error", expanded=True)
@@ -488,33 +484,26 @@ if generate_btn or st.session_state.itinerary_data:
         parts = st.session_state.itinerary_data.split("---TAB_SEPARATOR---")
         
         if len(parts) >= 4:
-            # Editor's Welcome sits beautifully outside the tabs
             st.markdown(f"### 📝 Editor's Welcome\n{parts[0]}", unsafe_allow_html=True)
             st.markdown("---")
             
             tab1, tab2, tab3 = st.tabs(["🗺️ Day-by-Day Itinerary", "🏨 Accommodations", "🛂 Logistics & Practicalities"])
             
             with tab1:
-                # OPTION 3: ACCORDION STYLE ITINERARY PARSING
                 itin_text = parts[1]
-                # Split the text beautifully by the mandatory Day header
                 days = re.split(r'(## Day \d+:.*)', itin_text)
                 
                 if len(days) > 1:
-                    # Render any introductory text before Day 1
                     if days[0].strip():
                         st.markdown(days[0], unsafe_allow_html=True)
                     
-                    # Loop through headers and content chunks
                     for i in range(1, len(days), 2):
                         day_header = days[i].replace("## ", "").strip()
                         day_content = days[i+1] if i+1 < len(days) else ""
                         
-                        # Expand the very first day by default, collapse the rest
                         with st.expander(day_header, expanded=(i==1)):
                             st.markdown(day_content, unsafe_allow_html=True)
                 else:
-                    # Fallback just in case AI ignores formatting rules
                     st.markdown(itin_text, unsafe_allow_html=True)
                     
             with tab2:
