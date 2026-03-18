@@ -23,8 +23,6 @@ if 'trip_params' not in st.session_state:
     st.session_state.trip_params = {}
 if 'celebrated' not in st.session_state:
     st.session_state.celebrated = False
-if 'trigger_generation' not in st.session_state:
-    st.session_state.trigger_generation = False
 
 # --- ADAPTIVE GLASSMORPHISM CSS ---
 st.markdown("""
@@ -237,19 +235,6 @@ def get_trending_destinations():
             {"destination": "Banff, Canada", "description": "Crystal lakes, towering peaks, and ultimate wilderness.", "image_url": "[https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80)"}
         ]
 
-# --- QUICK-START HELPER ---
-def trigger_quick_start(dest, days, month, budget, persona):
-    """Sets session state and instantly triggers generation."""
-    st.session_state.dest_name = dest
-    st.session_state.trip_params = {
-        "days": days,
-        "month": month,
-        "budget": budget,
-        "persona": persona
-    }
-    st.session_state.trigger_generation = True
-    st.rerun()
-
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
     st.image("[https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png)", width=50)
@@ -276,24 +261,17 @@ with st.sidebar:
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- INPUT VALIDATION & STATE RESET ---
-generate_pressed = generate_btn or st.session_state.trigger_generation
-
-if generate_pressed:
-    if st.session_state.trigger_generation:
-        # Bypass sidebar validation if a Quick-Start Chip was clicked
-        st.session_state.trigger_generation = False # Reset the flag
-    else:
-        # Standard button press validation
-        if not destination.strip():
-            st.sidebar.warning("⚠️ Please enter a destination.")
-            st.stop()
-        st.session_state.dest_name = destination
-        st.session_state.trip_params = {
-            "days": num_days,
-            "month": travel_month,
-            "budget": budget,
-            "persona": traveler_persona
-        }
+if generate_btn:
+    if not destination.strip():
+        st.sidebar.warning("⚠️ Please enter a destination.")
+        st.stop()
+    st.session_state.dest_name = destination
+    st.session_state.trip_params = {
+        "days": num_days,
+        "month": travel_month,
+        "budget": budget,
+        "persona": traveler_persona
+    }
 
     if not SYSTEM_GOOGLE_KEY:
         st.error("🚨 API Key missing!")
@@ -305,30 +283,11 @@ if generate_pressed:
 
 # --- MAIN SCREEN AREA ---
 
-# Empty State: Quick-Start Chips & Dynamic Inspiration Gallery
-if not generate_pressed and not st.session_state.itinerary_data:
+# Empty State: Dynamic Inspiration Gallery
+if not generate_btn and not st.session_state.itinerary_data:
     st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
-    
-    # 🚀 THE QUICK-START CHIPS
-    st.markdown("### 🚀 Quick-Start Scenarios")
-    st.markdown("<p style='color: #64748b; margin-top: -10px;'>Not sure where to go? Click a scenario to instantly generate a trip!</p>", unsafe_allow_html=True)
-    
-    q1, q2, q3, q4 = st.columns(4)
-    with q1:
-        if st.button("🍜 3-Day Taipei Food Run", use_container_width=True):
-            trigger_quick_start("Taipei, Taiwan", 3, "Oct", "Mid-Range", "Solo Independent Traveler")
-    with q2:
-        if st.button("🌸 5-Day Kyoto Spring Tour", use_container_width=True):
-            trigger_quick_start("Kyoto, Japan", 5, "Apr", "Luxury/Boutique", "Couple / DINKs")
-    with q3:
-        if st.button("🏖️ 4-Day Da Nang Retreat", use_container_width=True):
-            trigger_quick_start("Da Nang, Vietnam", 4, "Jul", "Budget/Backpacker", "Family with Young Children")
-    with q4:
-        if st.button("🎢 6-Day Osaka Theme Parks", use_container_width=True):
-            trigger_quick_start("Osaka, Japan", 6, "Dec", "Mid-Range", "Student Group")
-            
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.info("👈 Use the Dashboard on the left to configure your parameters and generate a custom AI dossier!")
     
     # 📈 TRENDING GALLERY
     st.markdown("### 📈 Trending Now for Hong Kong Travelers")
@@ -345,13 +304,13 @@ if not generate_pressed and not st.session_state.itinerary_data:
                 st.caption(place.get('description', ''))
 
 # Active State: Generating or Displaying Results
-if generate_pressed or st.session_state.itinerary_data:
+if generate_btn or st.session_state.itinerary_data:
     
-    disp_dest = st.session_state.dest_name
-    disp_days = st.session_state.trip_params["days"]
-    disp_month = st.session_state.trip_params["month"]
-    disp_budget = st.session_state.trip_params["budget"]
-    disp_persona = st.session_state.trip_params["persona"]
+    disp_dest = st.session_state.dest_name if st.session_state.dest_name else destination
+    disp_days = st.session_state.trip_params.get("days", num_days)
+    disp_month = st.session_state.trip_params.get("month", travel_month)
+    disp_budget = st.session_state.trip_params.get("budget", budget)
+    disp_persona = st.session_state.trip_params.get("persona", traveler_persona)
 
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{disp_dest.upper()}</h1>', unsafe_allow_html=True)
     
@@ -366,7 +325,7 @@ if generate_pressed or st.session_state.itinerary_data:
     st.markdown("---")
 
     # --- THE ENTERTAINING LOADING SCREEN ---
-    if generate_pressed:
+    if generate_btn:
         status_container = st.empty()
         with status_container.status("🤖 **AI Agents researching in parallel...**", expanded=True) as status:
             loading_msg = st.empty() # Dynamic rotating text container
