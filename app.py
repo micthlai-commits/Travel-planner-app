@@ -23,10 +23,8 @@ if 'trip_params' not in st.session_state:
     st.session_state.trip_params = {}
 if 'celebrated' not in st.session_state:
     st.session_state.celebrated = False
-if 'trigger_generation' not in st.session_state:
-    st.session_state.trigger_generation = False
 
-# --- ADAPTIVE GLASSMORPHISM CSS ---
+# --- OPTION 1: ADAPTIVE GLASSMORPHISM CSS ---
 st.markdown("""
 <style>
     /* Premium Timeline & Visual Styles */
@@ -81,7 +79,7 @@ st.markdown("""
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
     }
 
-    /* MODERN ACCORDIONS */
+    /* MODERN ACCORDIONS (Option 3) */
     [data-testid="stExpander"] {
         background: rgba(128, 128, 128, 0.02);
         border-radius: 12px;
@@ -232,27 +230,14 @@ def get_trending_destinations():
     except Exception as e:
         # Failsafe: Static trends if AI or internet fails
         return [
-            {"destination": "Tokyo, Japan", "description": "Neon lights, ancient temples, and culinary perfection.", "image_url": "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"},
-            {"destination": "Paris, France", "description": "Art, romance, and café culture by the Seine.", "image_url": "[https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80)"},
-            {"destination": "Banff, Canada", "description": "Crystal lakes, towering peaks, and ultimate wilderness.", "image_url": "[https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80)"}
+            {"destination": "Tokyo, Japan", "description": "Neon lights, ancient temples, and culinary perfection.", "image_url": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80"},
+            {"destination": "Paris, France", "description": "Art, romance, and café culture by the Seine.", "image_url": "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80"},
+            {"destination": "Banff, Canada", "description": "Crystal lakes, towering peaks, and ultimate wilderness.", "image_url": "https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80"}
         ]
-
-# --- QUICK-START HELPER ---
-def trigger_quick_start(dest, days, month, budget, persona):
-    """Sets session state and instantly triggers generation."""
-    st.session_state.dest_name = dest
-    st.session_state.trip_params = {
-        "days": days,
-        "month": month,
-        "budget": budget,
-        "persona": persona
-    }
-    st.session_state.trigger_generation = True
-    st.rerun()
 
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
-    st.image("[https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png)", width=50)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
     st.markdown("### ⚙️ Trip Configuration")
     
     destination = st.text_input("🛬 Destination:", "")
@@ -276,62 +261,36 @@ with st.sidebar:
     generate_btn = st.button("✨ Generate Premium Itinerary", use_container_width=True, type="primary")
 
 # --- INPUT VALIDATION & STATE RESET ---
-generate_pressed = generate_btn or st.session_state.trigger_generation
-
-if generate_pressed:
-    if st.session_state.trigger_generation:
-        # Bypass sidebar validation if a Quick-Start Chip was clicked
-        st.session_state.trigger_generation = False # Reset the flag
-    else:
-        # Standard button press validation
-        if not destination.strip():
-            st.sidebar.warning("⚠️ Please enter a destination.")
-            st.stop()
-        st.session_state.dest_name = destination
-        st.session_state.trip_params = {
-            "days": num_days,
-            "month": travel_month,
-            "budget": budget,
-            "persona": traveler_persona
-        }
+if generate_btn:
+    if not destination.strip():
+        st.sidebar.warning("⚠️ Please enter a destination.")
+        st.stop()
+    st.session_state.dest_name = destination
+    st.session_state.trip_params = {
+        "days": num_days,
+        "month": travel_month,
+        "budget": budget,
+        "persona": traveler_persona
+    }
 
     if not SYSTEM_GOOGLE_KEY:
         st.error("🚨 API Key missing!")
         st.stop()
         
-    # Reset displays before generating
+    # Reset displays
     st.session_state.itinerary_data = None
     st.session_state.celebrated = False
 
 # --- MAIN SCREEN AREA ---
 
-# Empty State: Quick-Start Chips & Dynamic Inspiration Gallery
-if not generate_pressed and not st.session_state.itinerary_data:
+# Empty State: Dynamic Inspiration Gallery
+if not generate_btn and not st.session_state.itinerary_data:
     st.markdown('<h1 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 0;">🌍 Destination Design Lab</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.3rem; color: #64748b; margin-bottom: 40px;">Design your perfect travel itinerary</p>', unsafe_allow_html=True)
+    st.info("👈 Use the Dashboard on the left to configure your parameters and generate a custom AI dossier!")
     
-    # 🚀 THE QUICK-START CHIPS
-    st.markdown("### 🚀 Quick-Start Scenarios")
-    st.markdown("<p style='color: #64748b; margin-top: -10px;'>Not sure where to go? Click a scenario to instantly generate a trip!</p>", unsafe_allow_html=True)
-    
-    q1, q2, q3, q4 = st.columns(4)
-    with q1:
-        if st.button("🍜 3-Day Taipei Food Run", use_container_width=True):
-            trigger_quick_start("Taipei, Taiwan", 3, "Oct", "Mid-Range", "Solo Independent Traveler")
-    with q2:
-        if st.button("🌸 5-Day Kyoto Spring Tour", use_container_width=True):
-            trigger_quick_start("Kyoto, Japan", 5, "Apr", "Luxury/Boutique", "Couple / DINKs")
-    with q3:
-        if st.button("🏖️ 4-Day Da Nang Retreat", use_container_width=True):
-            trigger_quick_start("Da Nang, Vietnam", 4, "Jul", "Budget/Backpacker", "Family with Young Children")
-    with q4:
-        if st.button("🎢 6-Day Osaka Theme Parks", use_container_width=True):
-            trigger_quick_start("Osaka, Japan", 6, "Dec", "Mid-Range", "Student Group")
-            
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # 📈 TRENDING GALLERY
     st.markdown("### 📈 Trending Now for Hong Kong Travelers")
+    
     with st.spinner("🤖 AI Scout is fetching today's top travel trends..."):
         trending_places = get_trending_destinations()
         
@@ -340,23 +299,23 @@ if not generate_pressed and not st.session_state.itinerary_data:
         if i < len(trending_places):
             place = trending_places[i]
             with col:
-                st.image(place.get("image_url", "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"), use_container_width=True)
+                st.image(place.get("image_url", "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80"), use_container_width=True)
                 st.markdown(f"#### 📍 {place.get('destination', 'Unknown')}")
                 st.caption(place.get('description', ''))
 
 # Active State: Generating or Displaying Results
-if generate_pressed or st.session_state.itinerary_data:
+if generate_btn or st.session_state.itinerary_data:
     
-    disp_dest = st.session_state.dest_name
-    disp_days = st.session_state.trip_params["days"]
-    disp_month = st.session_state.trip_params["month"]
-    disp_budget = st.session_state.trip_params["budget"]
-    disp_persona = st.session_state.trip_params["persona"]
+    disp_dest = st.session_state.dest_name if st.session_state.dest_name else destination
+    disp_days = st.session_state.trip_params.get("days", num_days)
+    disp_month = st.session_state.trip_params.get("month", travel_month)
+    disp_budget = st.session_state.trip_params.get("budget", budget)
+    disp_persona = st.session_state.trip_params.get("persona", traveler_persona)
 
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{disp_dest.upper()}</h1>', unsafe_allow_html=True)
     
     safe_dest = urllib.parse.quote(disp_dest)
-    st.image(f"[https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of](https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of)+{safe_dest}?width=1200&height=350", use_container_width=True)
+    st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
     
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("📍 Destination", disp_dest)
@@ -366,7 +325,7 @@ if generate_pressed or st.session_state.itinerary_data:
     st.markdown("---")
 
     # --- THE ENTERTAINING LOADING SCREEN ---
-    if generate_pressed:
+    if generate_btn:
         status_container = st.empty()
         with status_container.status("🤖 **AI Agents researching in parallel...**", expanded=True) as status:
             loading_msg = st.empty() # Dynamic rotating text container
@@ -393,6 +352,7 @@ if generate_pressed or st.session_state.itinerary_data:
                                 f"You are the Itinerary Planner for a {disp_days}-day trip to {disp_dest} in {disp_month}.",
                                 f"Traveler: '{disp_persona}'. Budget: '{disp_budget}'. Preferences: '{user_preferences}'.",
                                 "Generate ONLY the day-by-day schedule.",
+                                # OPTION 3 REQUIREMENT: Strict Header formatting
                                 "CRITICAL: You MUST start every single day with this exact header format: `## Day [Number]: [Theme of the Day]` (e.g., `## Day 1: Arrival & City Exploration`).",
                                 "For EVERY single location or restaurant, you MUST use this exact layout:",
                                 "### 📍 [Name of Location]",
@@ -456,6 +416,7 @@ if generate_pressed or st.session_state.itinerary_data:
                         future_itin = executor.submit(get_itinerary)
                         future_logistics = executor.submit(get_logistics)
                         
+                        # Entertaining Polling Loop 1
                         msgs1 = ["🗺️ Mapping out optimal routes...", "🕵️‍♂️ Asking locals for hidden gems...", "📝 Drafting day-by-day plans..."]
                         i = 0
                         while not (future_itin.done() and future_logistics.done()):
@@ -470,6 +431,7 @@ if generate_pressed or st.session_state.itinerary_data:
                         future_hotel = executor.submit(get_hotels, itinerary_content)
                         future_editor = executor.submit(get_editor, itinerary_content)
                         
+                        # Entertaining Polling Loop 2
                         msgs2 = ["🏨 Checking room availabilities...", "🛎️ Contacting hotel concierges...", "✍️ Polishing the executive summary..."]
                         i = 0
                         while not (future_hotel.done() and future_editor.done()):
@@ -484,6 +446,7 @@ if generate_pressed or st.session_state.itinerary_data:
                         future_itin_img = executor.submit(process_images, itinerary_content)
                         future_hotel_img = executor.submit(process_images, hotel_content)
                         
+                        # Entertaining Polling Loop 3
                         msgs3 = ["📸 Fetching cinematic photos...", "🖼️ Formatting the visual gallery...", "🎨 Applying finishing touches..."]
                         i = 0
                         while not (future_itin_img.done() and future_hotel_img.done()):
@@ -495,6 +458,7 @@ if generate_pressed or st.session_state.itinerary_data:
                         hotel_content = future_hotel_img.result()
                         loading_msg.success("✨ Finalizing your dossier!")
 
+                    # Note the strict separation to ensure parsing works perfectly
                     raw_content = f"{summary_content}\n\n---TAB_SEPARATOR---\n\n{itinerary_content}\n\n---TAB_SEPARATOR---\n\n{hotel_content}\n\n---TAB_SEPARATOR---\n\n{logistics_content}"
                     
                     success = True
@@ -508,7 +472,7 @@ if generate_pressed or st.session_state.itinerary_data:
                     
             if success:
                 st.session_state.itinerary_data = raw_content
-                status_container.empty() 
+                status_container.empty() # Clear loading status for instant display
                 st.rerun() 
             else:
                 status.update(label="❌ **Generation Failed**", state="error", expanded=True)
@@ -524,26 +488,33 @@ if generate_pressed or st.session_state.itinerary_data:
         parts = st.session_state.itinerary_data.split("---TAB_SEPARATOR---")
         
         if len(parts) >= 4:
+            # Editor's Welcome sits beautifully outside the tabs
             st.markdown(f"### 📝 Editor's Welcome\n{parts[0]}", unsafe_allow_html=True)
             st.markdown("---")
             
             tab1, tab2, tab3 = st.tabs(["🗺️ Day-by-Day Itinerary", "🏨 Accommodations", "🛂 Logistics & Practicalities"])
             
             with tab1:
+                # OPTION 3: ACCORDION STYLE ITINERARY PARSING
                 itin_text = parts[1]
+                # Split the text beautifully by the mandatory Day header
                 days = re.split(r'(## Day \d+:.*)', itin_text)
                 
                 if len(days) > 1:
+                    # Render any introductory text before Day 1
                     if days[0].strip():
                         st.markdown(days[0], unsafe_allow_html=True)
                     
+                    # Loop through headers and content chunks
                     for i in range(1, len(days), 2):
                         day_header = days[i].replace("## ", "").strip()
                         day_content = days[i+1] if i+1 < len(days) else ""
                         
+                        # Expand the very first day by default, collapse the rest
                         with st.expander(day_header, expanded=(i==1)):
                             st.markdown(day_content, unsafe_allow_html=True)
                 else:
+                    # Fallback just in case AI ignores formatting rules
                     st.markdown(itin_text, unsafe_allow_html=True)
                     
             with tab2:
