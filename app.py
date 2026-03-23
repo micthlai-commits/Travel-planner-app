@@ -230,14 +230,14 @@ def get_trending_destinations():
     except Exception as e:
         # Failsafe: Static trends if AI or internet fails
         return [
-            {"destination": "Tokyo, Japan", "description": "Neon lights, ancient temples, and culinary perfection.", "image_url": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80"},
-            {"destination": "Paris, France", "description": "Art, romance, and café culture by the Seine.", "image_url": "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80"},
-            {"destination": "Banff, Canada", "description": "Crystal lakes, towering peaks, and ultimate wilderness.", "image_url": "https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80"}
+            {"destination": "Tokyo, Japan", "description": "Neon lights, ancient temples, and culinary perfection.", "image_url": "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"},
+            {"destination": "Paris, France", "description": "Art, romance, and café culture by the Seine.", "image_url": "[https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&h=400&q=80)"},
+            {"destination": "Banff, Canada", "description": "Crystal lakes, towering peaks, and ultimate wilderness.", "image_url": "[https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1550236520-7050f3582da0?auto=format&fit=crop&w=600&h=400&q=80)"}
         ]
 
 # --- SIDEBAR: DASHBOARD LAYOUT ---
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png", width=50)
+    st.image("[https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/1200px-Python-logo-notext.svg.png)", width=50)
     st.markdown("### ⚙️ Trip Configuration")
     
     destination = st.text_input("🛬 Destination:", "")
@@ -277,7 +277,7 @@ if generate_btn:
         st.error("🚨 API Key missing!")
         st.stop()
         
-    # Reset displays
+    # Reset displays before generating
     st.session_state.itinerary_data = None
     st.session_state.celebrated = False
 
@@ -299,7 +299,7 @@ if not generate_btn and not st.session_state.itinerary_data:
         if i < len(trending_places):
             place = trending_places[i]
             with col:
-                st.image(place.get("image_url", "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80"), use_container_width=True)
+                st.image(place.get("image_url", "[https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80](https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=600&h=400&q=80)"), use_container_width=True)
                 st.markdown(f"#### 📍 {place.get('destination', 'Unknown')}")
                 st.caption(place.get('description', ''))
 
@@ -315,7 +315,7 @@ if generate_btn or st.session_state.itinerary_data:
     st.markdown(f'<h1 style="text-align: center; font-size: 3rem; font-weight: 900;">{disp_dest.upper()}</h1>', unsafe_allow_html=True)
     
     safe_dest = urllib.parse.quote(disp_dest)
-    st.image(f"https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of+{safe_dest}?width=1200&height=350", use_container_width=True)
+    st.image(f"[https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of](https://image.pollinations.ai/prompt/Beautiful+Cinematic+Landscape+Photography+of)+{safe_dest}?width=1200&height=350", use_container_width=True)
     
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("📍 Destination", disp_dest)
